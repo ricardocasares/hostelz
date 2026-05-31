@@ -64,6 +64,16 @@ Env files:
 - `.env.local` — your dev values (gitignored)
 - `.env.test` — test DB config, no secrets (committed)
 
+## Logging
+
+Structured logging goes through a small `log` abstraction (`src/log.gleam`) with a built-in writer (`src/logging.gleam`); handlers depend only on `log`, so the backend is swappable. Configured from env:
+
+- `LOG_ENABLED` — `true` (default) / `false` (disables all output)
+- `LOG_LEVEL` — `debug` | `info` (default) | `warn` | `error`
+- `LOG_FORMAT` — `json` (default) | `text`
+
+Each request gets a `request_id` (from an inbound `X-Request-Id` header, else generated and echoed back), and the logger handed to handlers is pre-bound with `request_id`/`method`/`path`. Handlers add fields with `log.with(deps.logger, [log.string("k", v)])` then `log.info(_, "…")`.
+
 ## Development
 
 ```sh
