@@ -1,0 +1,42 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# graphile-migrate's afterAllMigrations dumps schema.sql unless CI=1; skip it on CI.
+env:
+  CI: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: hostelix_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      - run: bun install --frozen-lockfile
+      - run: bun run test # test:db (graphile-migrate) + test:gleam
+      - run: bun gleam format --check src test
+      # Build the app, minus build:db (no migrate). build:vite compiles Gleam too;
+      # build:api then bundles it from build/dev/javascript/hostelz (@build/*).
+      - run: bun run build:vite
+      - run: bun run build:api

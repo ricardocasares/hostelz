@@ -1,0 +1,10 @@
+{
+  "migrationsFolder": "./src/db/migrations",
+  "afterAllMigrations": [
+    {
+      "_": "command",
+      "command": "if [ \"$CI\" != \"1\" ]; then pg_dump --schema-only --no-owner --exclude-schema=graphile_migrate --file=src/db/schema.sql \"$GM_DBURL\"; fi"
+    }
+  ],
+  "//generatedWith": "1.4.1"
+}
