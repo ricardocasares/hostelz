@@ -18,6 +18,7 @@ import domain/space.{type SpaceId}
 import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option, None, Some}
+import gleam/result
 
 /// One requested item: `kind` is "whole" (pin the space) or "unit" (an
 /// unassigned hold against a room-type).
@@ -181,17 +182,16 @@ fn finish_item(
   sp: space.Space,
   kind: String,
 ) -> Result(BookingItem, CreateBookingError) {
-  case booking_item.new_id(generate_id()) {
-    Error(_) -> Error(InvalidId)
-    Ok(iid) ->
-      case kind {
-        "whole" ->
-          case space.is_bookable(sp) {
-            False -> Error(NotBookable)
-            True -> Ok(booking_item.whole(iid, bid, p, sid))
-          }
-        "unit" -> Ok(booking_item.unit_in(iid, bid, p, sid))
-        other -> Error(InvalidKind(other))
+  use iid <- result.try(
+    booking_item.new_id(generate_id()) |> result.replace_error(InvalidId),
+  )
+  case kind {
+    "whole" ->
+      case space.is_bookable(sp) {
+        False -> Error(NotBookable)
+        True -> Ok(booking_item.whole(iid, bid, p, sid))
       }
+    "unit" -> Ok(booking_item.unit_in(iid, bid, p, sid))
+    other -> Error(InvalidKind(other))
   }
 }
