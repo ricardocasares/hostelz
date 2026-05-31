@@ -1,7 +1,6 @@
 # gleam
 *.beam
 *.ez
-!/api
 /build
 erl_crash.dump
 
