@@ -1,29 +1,30 @@
 //// The middleware stack and route dispatch. `api.main` adapts the JS
-//// `Request`/`Response` and hands every request to `handle`, which is the only
-//// thing the entrypoint needs to know about.
+//// `Request`/`Response` and hands every request to `handle`.
+////
+//// Authentication is a single middleware: `register`/`login` are public, and
+//// every other route is wrapped once by `guard.require_auth`, which resolves
+//// the Bearer token to the current `User` (401 otherwise) and threads it into
+//// the protected handlers. Authorization (per-permission) is enforced inside
+//// each protected handler via `guard.require_permission`.
 
 import conversation.{type RequestBody, type ResponseBody}
-import gleam/http.{Get, Post}
+import domain/user.{type User}
+import gleam/http.{Delete, Get, Post, Put}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import gleam/io
 import gleam/javascript/promise.{type Promise}
+import router/auth
 import router/context.{type Deps}
+import router/guard
 import router/guests
+import router/members
 import router/organizations
 import router/reply
+import router/roles
 import router/spaces
-import router/users
 
-/// The middleware stack, followed by dispatch. Each `use` wraps everything
-/// below it, so the block after the middleware *is* the handler they wrap.
-///
-/// Handlers receive the whole `Request`, so they can reach the body (which is
-/// asynchronous and read-once — see `router/guests`), headers and query.
-///
-/// `deps` (the db connection, etc.) is built once by `api.main` and threaded in
-/// so handlers that touch the database — like `router/guests` — can reach it.
 pub fn handle(
   deps: Deps,
   req: Request(RequestBody),
@@ -38,23 +39,60 @@ pub fn handle(
     segments -> segments
   }
 
-  // The guests handlers read the body / await the database, so they return a
-  // `Promise` directly; the 405 fallback is synchronous, wrapped by the single
-  // `promise.resolve`.
   case req.method, segments {
-    Get, ["organizations"] -> organizations.list(deps)
-    Post, ["organizations"] -> organizations.create(deps, req)
-    Get, ["organizations", id] -> organizations.show(deps, id)
-    Get, ["organizations", oid, "guests"] -> guests.list_for_org(deps, oid)
-    Post, ["organizations", oid, "guests"] -> guests.create(deps, oid, req)
-    Get, ["organizations", oid, "spaces"] -> spaces.list_for_org(deps, oid)
-    Post, ["organizations", oid, "spaces"] -> spaces.create(deps, oid, req)
-    Get, ["users"] -> users.list(deps)
-    Post, ["users"] -> users.create(deps, req)
-    Get, ["users", id] -> users.show(deps, id)
-    Get, ["guests", id] -> guests.show(deps, id)
-    Get, ["spaces", id] -> spaces.show(deps, id)
-    Get, ["spaces", id, "children"] -> spaces.list_children(deps, id)
+    // Public: no session required.
+    Post, ["auth", "register"] -> auth.register(deps, req)
+    Post, ["auth", "login"] -> auth.login(deps, req)
+
+    // Everything else requires authentication; the user is threaded through.
+    _, _ -> {
+      use user <- guard.require_auth(deps, req)
+      dispatch(deps, user, req, segments)
+    }
+  }
+}
+
+fn dispatch(
+  deps: Deps,
+  user: User,
+  req: Request(RequestBody),
+  segments: List(String),
+) -> Promise(Response(ResponseBody)) {
+  case req.method, segments {
+    Post, ["auth", "logout"] -> auth.logout(deps, req)
+    Get, ["auth", "me"] -> auth.me(deps, user)
+
+    Get, ["organizations"] -> organizations.list(deps, user)
+    Post, ["organizations"] -> organizations.create(deps, user, req)
+    Get, ["organizations", id] -> organizations.show(deps, user, id)
+
+    Get, ["organizations", oid, "members"] -> members.list(deps, user, oid)
+    Post, ["organizations", oid, "members"] -> members.add(deps, user, oid, req)
+    Put, ["organizations", oid, "members", uid] ->
+      members.update_role(deps, user, oid, uid, req)
+    Delete, ["organizations", oid, "members", uid] ->
+      members.remove(deps, user, oid, uid)
+
+    Get, ["organizations", oid, "roles"] -> roles.list(deps, user, oid)
+    Post, ["organizations", oid, "roles"] -> roles.create(deps, user, oid, req)
+    Put, ["organizations", oid, "roles", rid] ->
+      roles.update(deps, user, oid, rid, req)
+    Delete, ["organizations", oid, "roles", rid] ->
+      roles.delete(deps, user, oid, rid)
+
+    Get, ["organizations", oid, "guests"] ->
+      guests.list_for_org(deps, user, oid)
+    Post, ["organizations", oid, "guests"] ->
+      guests.create(deps, user, oid, req)
+    Get, ["organizations", oid, "spaces"] ->
+      spaces.list_for_org(deps, user, oid)
+    Post, ["organizations", oid, "spaces"] ->
+      spaces.create(deps, user, oid, req)
+
+    Get, ["guests", id] -> guests.show(deps, user, id)
+    Get, ["spaces", id] -> spaces.show(deps, user, id)
+    Get, ["spaces", id, "children"] -> spaces.list_children(deps, user, id)
+
     _, _ -> promise.resolve(reply.text(405, "Method not allowed"))
   }
 }

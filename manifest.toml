@@ -41,6 +41,7 @@ brioche = { version = ">= 0.3.0 and < 1.0.0" }
 bun_squirrel = { git = "https://github.com/ricardocasares/bun-squirrel", ref = "main" }
 conversation = { version = ">= 2.0.2 and < 3.0.0" }
 glanoid = { version = ">= 1.0.1 and < 2.0.0" }
+gleam_crypto = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_http = { version = ">= 4.3.0 and < 5.0.0" }
 gleam_javascript = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_json = { version = ">= 3.1.0 and < 4.0.0" }

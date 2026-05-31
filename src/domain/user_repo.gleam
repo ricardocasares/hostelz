@@ -4,19 +4,9 @@
 //// this type.
 
 import domain/email.{type Email}
+import domain/repo_error.{type RepoError}
 import domain/user.{type User, type UserId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  /// No user exists for the given id or email.
-  NotFound
-  /// A unique constraint was violated (the email is already registered).
-  Conflict(String)
-  /// A stored row could not be turned back into a valid `User`.
-  Corrupt(String)
-  /// The storage backend itself failed (connection, query, ...).
-  StorageError(String)
-}
 
 pub type UserRepo {
   UserRepo(

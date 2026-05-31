@@ -7,6 +7,7 @@ This is hostelz, a PMS for hostelz and more.
 - keep README.md updated
 - keen `.env*` files updated
 - use `gleam check` for type-checking
+- always run `gleam format`
 - use `bun run test` for running tests
 - use `bun run build` to compile everything
 

@@ -7,11 +7,11 @@
 import brioche/sql as db
 import db/sql as queries
 import domain/email.{type Email}
-import domain/user.{type User, type UserId}
-import domain/user_repo.{
-  type RepoError, type UserRepo, Conflict, Corrupt, NotFound, StorageError,
-  UserRepo,
+import domain/repo_error.{
+  type RepoError, Conflict, Corrupt, NotFound, StorageError,
 }
+import domain/user.{type User, type UserId}
+import domain/user_repo.{type UserRepo, UserRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/result

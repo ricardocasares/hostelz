@@ -1,7 +1,8 @@
 //// Application use case: list the direct children of a space.
 
+import domain/repo_error.{type RepoError}
 import domain/space.{type Space, type SpaceId}
-import domain/space_repo.{type RepoError, type SpaceRepo}
+import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 

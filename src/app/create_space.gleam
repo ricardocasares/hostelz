@@ -7,8 +7,9 @@
 //// organization. Finally persists via the repository port.
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/space.{type Space, type SpaceId}
-import domain/space_repo.{type RepoError, type SpaceRepo}
+import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -90,7 +91,7 @@ fn check_parent(
     Some(pid) -> {
       use found <- promise.map(repo.find(pid))
       case found {
-        Error(space_repo.NotFound) -> Error(ParentNotFound)
+        Error(repo_error.NotFound) -> Error(ParentNotFound)
         Error(other) -> Error(RepoFailed(other))
         Ok(parent) -> validate_parent(parent, organization_id)
       }

@@ -1,19 +1,12 @@
-//// The guests HTTP handlers — pure translation between the wire and the
-//// `register_guest` / `list_organization_guests` / `find_guest` use cases.
-////
-//// Guests are nested under their organization:
-////   `POST /organizations/:org_id/guests` (`create`) registers a guest from a
-////   JSON body `{"name","email"}` plus an optional `"user_id"` linking the
-////   guest to a system account; omit it for a walk-in. The org is resolved
-////   first (404 if unknown), and a supplied user is resolved too (404 if
-////   unknown). `GET /organizations/:org_id/guests` (`list_for_org`) lists that
-////   org's guests. `GET /guests/:id` (`show`) returns a single guest globally.
-////
-//// Domain validation failures are the client's fault (422); a missing org/user
-//// is 404; a repository failure is ours (500) and stays opaque.
+//// The guests HTTP handlers, gated by `guest:*` permissions. Guests are nested
+//// under their organization:
+////   `POST /organizations/:org_id/guests` (`create`, `guest:create`) — body
+////   `{"name","email"}` plus an optional `"user_id"` (a walk-in omits it; a
+////   supplied user is resolved, 404 if unknown). `GET /organizations/:org_id/guests`
+////   (`list_for_org`, `guest:read`). `GET /guests/:id` (`show`) resolves the
+////   guest then checks `guest:read` on its organization.
 
 import app/find_guest
-import app/find_organization
 import app/find_user
 import app/list_organization_guests
 import app/register_guest.{
@@ -21,12 +14,12 @@ import app/register_guest.{
 }
 import conversation.{type RequestBody, type ResponseBody}
 import db/guest_repo
-import db/organization_repo
 import db/user_repo
 import domain/email
 import domain/guest.{type Guest}
 import domain/organization.{type OrganizationId}
-import domain/user.{type UserId}
+import domain/permission
+import domain/user.{type User, type UserId}
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
@@ -34,81 +27,68 @@ import gleam/javascript/promise.{type Promise}
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import router/context.{type Deps}
+import router/guard
 import router/reply
 
-/// The shape we accept in the request body. `user_id` is optional — absent (or
-/// null) means a walk-in guest with no linked account.
 type NewGuest {
   NewGuest(name: String, email: String, user_id: Option(String))
 }
 
-/// `GET /organizations/:org_id/guests` — the org's guests, newest first.
 pub fn list_for_org(
   deps: Deps,
+  user: User,
   org_id: String,
 ) -> Promise(Response(ResponseBody)) {
-  case organization.new_id(org_id) {
-    Error(reason) ->
+  use oid <- guard.require_permission(deps, user, org_id, permission.GuestRead)
+  let repo = guest_repo.new(deps.db)
+  use result <- promise.map(list_organization_guests.run(repo, oid))
+  case result {
+    Ok(guests) -> reply.json_response(200, json.array(guests, guest_to_json))
+    Error(list_organization_guests.RepoFailed(_)) ->
+      reply.json_response(500, error_json("could not list guests"))
+  }
+}
+
+pub fn show(
+  deps: Deps,
+  user: User,
+  id: String,
+) -> Promise(Response(ResponseBody)) {
+  let repo = guest_repo.new(deps.db)
+  use result <- promise.await(find_guest.run(repo, id))
+  case result {
+    Error(find_guest.NotFound) | Error(find_guest.InvalidId(_)) ->
+      promise.resolve(reply.json_response(404, error_json("guest not found")))
+    Error(find_guest.RepoFailed(_)) ->
       promise.resolve(reply.json_response(
-        422,
-        error_json(organization_error_message(reason)),
+        500,
+        error_json("could not load guest"),
       ))
-    Ok(oid) -> {
-      let repo = guest_repo.new(deps.db)
-      use result <- promise.map(list_organization_guests.run(repo, oid))
-      case result {
-        Ok(guests) ->
-          reply.json_response(200, json.array(guests, guest_to_json))
-        Error(list_organization_guests.RepoFailed(_)) ->
-          reply.json_response(500, error_json("could not list guests"))
-      }
+    Ok(g) -> {
+      use <- guard.require_permission_for_org(
+        deps,
+        user,
+        guest.organization_id(g),
+        permission.GuestRead,
+      )
+      promise.resolve(reply.json_response(200, guest_to_json(g)))
     }
   }
 }
 
-/// `GET /guests/:id` — a single guest by id, or 404 if none exists.
-pub fn show(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
-  let repo = guest_repo.new(deps.db)
-  use result <- promise.map(find_guest.run(repo, id))
-  case result {
-    Ok(g) -> reply.json_response(200, guest_to_json(g))
-    Error(find_guest.InvalidId(reason)) ->
-      reply.json_response(422, error_json(guest_error_message(reason)))
-    Error(find_guest.NotFound) ->
-      reply.json_response(404, error_json("guest not found"))
-    Error(find_guest.RepoFailed(_)) ->
-      reply.json_response(500, error_json("could not load guest"))
-  }
-}
-
-/// `POST /organizations/:org_id/guests` — register a guest under an org.
 pub fn create(
   deps: Deps,
+  user: User,
   org_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  // Resolve the org first: this validates the id and confirms it exists, so an
-  // unknown org is a clean 404 rather than a foreign-key 500 at save time.
-  let org_repo = organization_repo.new(deps.db)
-  use org_result <- promise.await(find_organization.run(org_repo, org_id))
-  case org_result {
-    Error(find_organization.InvalidId(reason)) ->
-      promise.resolve(reply.json_response(
-        422,
-        error_json(organization_error_message(reason)),
-      ))
-    Error(find_organization.NotFound) ->
-      promise.resolve(reply.json_response(
-        404,
-        error_json("organization not found"),
-      ))
-    Error(find_organization.RepoFailed(_)) ->
-      promise.resolve(reply.json_response(
-        500,
-        error_json("could not load organization"),
-      ))
-    Ok(org) -> create_under_org(deps, organization.id(org), req)
-  }
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.GuestCreate,
+  )
+  create_under_org(deps, oid, req)
 }
 
 fn create_under_org(
@@ -224,13 +204,6 @@ fn guest_error_message(error: guest.GuestError) -> String {
   case error {
     guest.EmptyId -> "id must not be empty"
     guest.EmptyName -> "name must not be empty"
-  }
-}
-
-fn organization_error_message(error: organization.OrganizationError) -> String {
-  case error {
-    organization.EmptyId -> "organization id must not be empty"
-    organization.EmptyName -> "organization name must not be empty"
   }
 }
 

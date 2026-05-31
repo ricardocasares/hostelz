@@ -7,7 +7,8 @@
 //// can answer 404, distinct from a genuine storage failure (500).
 
 import domain/guest.{type Guest}
-import domain/guest_repo.{type GuestRepo, type RepoError}
+import domain/guest_repo.{type GuestRepo}
+import domain/repo_error.{type RepoError}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 
@@ -35,7 +36,7 @@ pub fn run(
 
 fn to_error(error: RepoError) -> FindGuestError {
   case error {
-    guest_repo.NotFound -> NotFound
+    repo_error.NotFound -> NotFound
     other -> RepoFailed(other)
   }
 }

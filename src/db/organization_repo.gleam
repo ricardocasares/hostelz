@@ -9,11 +9,12 @@
 import brioche/sql as db
 import db/sql as queries
 import domain/organization.{type Organization, type OrganizationId}
-import domain/organization_repo.{
-  type OrganizationRepo, type RepoError, Conflict, Corrupt, NotFound,
-  OrganizationRepo, StorageError,
+import domain/organization_repo.{type OrganizationRepo, OrganizationRepo}
+import domain/repo_error.{
+  type RepoError, Conflict, Corrupt, NotFound, StorageError,
 }
 import domain/slug.{type Slug}
+import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/result
@@ -25,6 +26,7 @@ pub fn new(conn: db.Connection) -> OrganizationRepo {
     find: fn(id) { find(conn, id) },
     find_by_slug: fn(s) { find_by_slug(conn, s) },
     list_all: fn() { list_all(conn) },
+    list_for_user: fn(uid) { list_for_user(conn, uid) },
   )
 }
 
@@ -79,6 +81,21 @@ fn list_all(
   conn: db.Connection,
 ) -> Promise(Result(List(Organization), RepoError)) {
   use res <- promise.map(queries.list_organizations(conn))
+  case res {
+    Error(e) -> Error(storage_error(e))
+    Ok(db.Returned(rows:, ..)) ->
+      list.try_map(rows, fn(row) { reconstruct(row.id, row.slug, row.name) })
+  }
+}
+
+fn list_for_user(
+  conn: db.Connection,
+  uid: UserId,
+) -> Promise(Result(List(Organization), RepoError)) {
+  use res <- promise.map(queries.list_user_organizations(
+    conn,
+    user.user_id(uid),
+  ))
   case res {
     Error(e) -> Error(storage_error(e))
     Ok(db.Returned(rows:, ..)) ->

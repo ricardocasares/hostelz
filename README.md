@@ -22,27 +22,33 @@ DDD layering under `src/`:
 - `router/` — HTTP routing, request context, replies
 - `api.gleam` / `api.ts` — server entry (a Bun `fetch` handler)
 
-Aggregates: **Organization** (a tenant; has a unique URL `slug`), **User** (a system account; unique email), **Guest**, and **Space**. A guest **belongs to an organization** (mandatory) and **may be linked to a user** (optional — walk-ins have no account). A **Space** is the bookable inventory: a tree (adjacency list via a nullable `parent_id`) of either a `unit` (an atomic sleepable leaf — bed, bunk, private room) or a `grouping` (room, dorm, cabin, hostel, …); both carry a free-form `label`. Any space is bookable; only a grouping may contain children. Each aggregate holds the other's id as a value object, never the whole aggregate. (Bookings/availability are not built yet.)
+Aggregates: **Organization** (a tenant; unique URL `slug`), **User** (a system account; unique email, argon2id password in a separate `user_credentials`), **Guest**, **Space**, plus the authz aggregates **Role** and **Membership**. A guest **belongs to an organization** (mandatory) and **may be linked to a user** (optional — walk-ins have no account). A **Space** is the bookable inventory: a tree (adjacency list via a nullable `parent_id`) of either a `unit` (an atomic sleepable leaf — bed, bunk, private room) or a `grouping` (room, dorm, cabin, hostel, …); both carry a free-form `label`. Any space is bookable; only a grouping may contain children. Each aggregate holds the other's id as a value object, never the whole aggregate. (Bookings/availability are not built yet.)
+
+## Authentication & authorization
+
+- **Authentication** is a single middleware (`router/guard.require_auth`): `POST /api/auth/register` + `POST /api/auth/login` are public; every other route requires `Authorization: Bearer <token>`. Login returns an opaque token; only its `sha256` is stored in `sessions` (revocable, 30-day expiry in SQL).
+- **Authorization** is **permission-based RBAC**. Routes check a `Permission` (a code-defined catalog of fine-grained `resource:action` values), never a role name. **Roles are per-org data** (`roles` + `role_permissions`); a **Membership** gives a user exactly one role per org. Creating an org seeds a single system **Owner** role (implicitly all permissions, immutable) for the creator; other roles are created by the org and assigned to members. The `require_permission` seam reserves room for per-resource scoping later.
 
 ## HTTP API
 
-All routes are under `/api`. Bodies and responses are JSON; ids are server-minted.
+All routes are under `/api`. Bodies and responses are JSON; ids are server-minted. Except `register`/`login`, every route needs a Bearer token (`401` if missing/invalid); org-scoped routes also need the matching permission (`403` otherwise).
 
-| Method & path | Body | Notes |
+| Method & path | Body | Permission / notes |
 | --- | --- | --- |
-| `POST /organizations` | `{name, slug}` | 201; 409 if the slug is taken, 422 if invalid |
-| `GET /organizations` | — | list, newest first |
-| `GET /organizations/:id` | — | one, or 404 |
-| `POST /users` | `{email, name}` | 201; 409 if the email is taken |
-| `GET /users` · `GET /users/:id` | — | list / one |
-| `POST /organizations/:org_id/guests` | `{name, email, user_id?}` | 201; `user_id` optional (omit for a walk-in); 404 if the org or user is unknown |
-| `GET /organizations/:org_id/guests` | — | the org's guests |
-| `GET /guests/:id` | — | one, or 404 |
-| `POST /organizations/:org_id/spaces` | `{name, kind, label, parent_id?}` | 201; `kind` is `"unit"`/`"grouping"`; omit `parent_id` for a root; 404 unknown org/parent; 422 if the parent is a unit (can't contain children) |
-| `GET /organizations/:org_id/spaces` | — | the org's spaces (flat; build the tree from `parent_id`) |
-| `GET /spaces/:id` · `GET /spaces/:id/children` | — | one / its direct children |
+| `POST /auth/register` | `{email, name, password}` | public; 201; 409 email taken; 422 short password (min 8) |
+| `POST /auth/login` | `{email, password}` | public; 200 `{token, user}`; 401 on bad creds |
+| `POST /auth/logout` · `GET /auth/me` | — | any authenticated user |
+| `POST /organizations` | `{name, slug}` | authenticated → creator becomes **Owner**; 409 slug taken |
+| `GET /organizations` | — | the caller's organizations |
+| `GET /organizations/:id` | — | `org:read` |
+| `GET/POST /organizations/:id/roles`, `PUT/DELETE …/roles/:rid` | `{name, permissions[]}` | `role:read`/`create`/`update`/`delete`; the Owner role can't be edited/deleted |
+| `GET/POST /organizations/:id/members`, `PUT/DELETE …/members/:uid` | `{email, role_id}` / `{role_id}` | `member:read`/`create`/`update`/`delete`; last-Owner removal/demotion refused |
+| `GET/POST /organizations/:id/guests` | `{name, email, user_id?}` | `guest:read` / `guest:create` |
+| `GET /guests/:id` | — | `guest:read` on its org |
+| `GET/POST /organizations/:id/spaces` | `{name, kind, label, parent_id?}` | `space:read` / `space:create` |
+| `GET /spaces/:id` · `/children` | — | `space:read` on its org |
 
-Slug uniqueness and email uniqueness are enforced by database unique indexes (surfaced as `409`), not read-then-write checks.
+Slug and email uniqueness are enforced by database unique indexes (surfaced as `409`), not read-then-write checks.
 
 ## Setup
 

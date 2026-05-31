@@ -1,66 +1,70 @@
-//// The organizations HTTP handlers — pure translation between the wire and the
-//// `create_organization` / `list_organizations` / `find_organization` use
-//// cases.
+//// The organizations HTTP handlers.
 ////
-//// `POST /organizations` (`create`) creates one from `{"name","slug"}`; the id
-//// is minted server-side. `GET /organizations` (`list`) returns every org;
-//// `GET /organizations/:id` (`show`) returns one or 404.
-////
-//// Validation failures are the client's fault (422); a taken slug is a conflict
-//// (409); a repository failure is ours (500) and stays opaque.
+//// `POST /organizations` (`create`) creates one from `{"name","slug"}` and
+//// makes the caller its Owner; any authenticated user may. `GET /organizations`
+//// (`list`) returns the caller's organizations. `GET /organizations/:id`
+//// (`show`) returns one, gated by `org:read` membership.
 
 import app/create_organization.{
   type CreateOrganizationError, InvalidOrganization, InvalidSlug, RepoFailed,
   SlugTaken,
 }
 import app/find_organization
-import app/list_organizations
+import app/list_user_organizations
 import conversation.{type RequestBody, type ResponseBody}
+import db/membership_repo
 import db/organization_repo
+import db/role_repo
 import domain/organization.{type Organization}
+import domain/permission
 import domain/slug
+import domain/user.{type User}
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/javascript/promise.{type Promise}
 import gleam/json
 import router/context.{type Deps}
+import router/guard
 import router/reply
 
-/// The shape we accept in the request body.
 type NewOrganization {
   NewOrganization(name: String, slug: String)
 }
 
-/// `GET /organizations` — every organization as a JSON array, newest first.
-pub fn list(deps: Deps) -> Promise(Response(ResponseBody)) {
+/// `GET /organizations` — the organizations the current user belongs to.
+pub fn list(deps: Deps, user: User) -> Promise(Response(ResponseBody)) {
   let repo = organization_repo.new(deps.db)
-  use result <- promise.map(list_organizations.run(repo))
+  use result <- promise.map(list_user_organizations.run(repo, user.id(user)))
   case result {
     Ok(orgs) -> reply.json_response(200, json.array(orgs, org_to_json))
-    Error(list_organizations.RepoFailed(_)) ->
+    Error(list_user_organizations.RepoFailed(_)) ->
       reply.json_response(500, error_json("could not list organizations"))
   }
 }
 
-/// `GET /organizations/:id` — a single organization by id, or 404.
-pub fn show(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
+/// `GET /organizations/:id` — a single organization, for its members.
+pub fn show(
+  deps: Deps,
+  user: User,
+  id: String,
+) -> Promise(Response(ResponseBody)) {
+  use _oid <- guard.require_permission(deps, user, id, permission.OrgRead)
   let repo = organization_repo.new(deps.db)
   use result <- promise.map(find_organization.run(repo, id))
   case result {
     Ok(org) -> reply.json_response(200, org_to_json(org))
-    Error(find_organization.InvalidId(reason)) ->
-      reply.json_response(422, error_json(organization_error_message(reason)))
-    Error(find_organization.NotFound) ->
+    Error(find_organization.NotFound) | Error(find_organization.InvalidId(_)) ->
       reply.json_response(404, error_json("organization not found"))
     Error(find_organization.RepoFailed(_)) ->
       reply.json_response(500, error_json("could not load organization"))
   }
 }
 
-/// `POST /organizations` — create one from a JSON body `{"name","slug"}`.
+/// `POST /organizations` — create one and become its Owner.
 pub fn create(
   deps: Deps,
+  user: User,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
   use payload <- promise.await(conversation.read_json(req.body))
@@ -75,10 +79,12 @@ pub fn create(
             error_json("expected \"name\" and \"slug\" strings"),
           ))
         Ok(input) -> {
-          let repo = organization_repo.new(deps.db)
           use result <- promise.map(create_organization.run(
-            repo,
+            organization_repo.new(deps.db),
+            role_repo.new(deps.db),
+            membership_repo.new(deps.db),
             deps.generate_id,
+            user.id(user),
             input.slug,
             input.name,
           ))
@@ -107,20 +113,13 @@ fn org_to_json(o: Organization) -> json.Json {
 
 fn error_response(error: CreateOrganizationError) -> Response(ResponseBody) {
   case error {
-    InvalidOrganization(reason) ->
-      reply.json_response(422, error_json(organization_error_message(reason)))
+    InvalidOrganization(_) ->
+      reply.json_response(422, error_json("name must not be empty"))
     InvalidSlug(reason) ->
       reply.json_response(422, error_json(slug_error_message(reason)))
     SlugTaken -> reply.json_response(409, error_json("slug already taken"))
     RepoFailed(_) ->
       reply.json_response(500, error_json("could not save organization"))
-  }
-}
-
-fn organization_error_message(error: organization.OrganizationError) -> String {
-  case error {
-    organization.EmptyId -> "id must not be empty"
-    organization.EmptyName -> "name must not be empty"
   }
 }
 

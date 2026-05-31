@@ -1,29 +1,24 @@
-//// The spaces HTTP handlers — pure translation between the wire and the
-//// `create_space` / `list_organization_spaces` / `find_space` /
-//// `list_child_spaces` use cases.
-////
-//// Spaces are the bookable inventory tree, nested under their organization:
-////   `POST /organizations/:org_id/spaces` (`create`) from a JSON body
-////   `{"name","kind":"unit"|"grouping","label","parent_id"?}` — omit `parent_id`
-////   for a root. The org is resolved first (404 if unknown); the create use
-////   case then enforces the parent rules (exists, is a grouping, same org).
-////   `GET /organizations/:org_id/spaces` (`list_for_org`) lists the org's
-////   spaces; `GET /spaces/:id` (`show`) one; `GET /spaces/:id/children`
-////   (`list_children`) the direct children.
+//// The spaces HTTP handlers. Spaces are the bookable inventory tree, nested
+//// under their organization and gated by `space:*` permissions:
+////   `POST /organizations/:org_id/spaces` (`create`, `space:create`),
+////   `GET /organizations/:org_id/spaces` (`list_for_org`, `space:read`),
+////   `GET /spaces/:id` (`show`) and `GET /spaces/:id/children`
+////   (`list_children`) — both resolve the resource then check `space:read` on
+////   its organization.
 
 import app/create_space.{
   type CreateSpaceError, InvalidSpace, ParentDifferentOrganization,
   ParentNotFound, ParentNotGrouping, RepoFailed,
 }
-import app/find_organization
 import app/find_space
 import app/list_child_spaces
 import app/list_organization_spaces
 import conversation.{type RequestBody, type ResponseBody}
-import db/organization_repo
 import db/space_repo
-import domain/organization
+import domain/organization.{type OrganizationId}
+import domain/permission
 import domain/space.{type Space, type SpaceId}
+import domain/user.{type User}
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
@@ -31,68 +26,78 @@ import gleam/javascript/promise.{type Promise}
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import router/context.{type Deps}
+import router/guard
 import router/reply
 
-/// The shape we accept in the request body. `parent_id` is optional — absent
-/// means a root space.
 type NewSpace {
   NewSpace(name: String, kind: String, label: String, parent_id: Option(String))
 }
 
-/// `GET /organizations/:org_id/spaces` — the org's spaces (flat; the caller
-/// assembles the tree from each space's parent_id).
 pub fn list_for_org(
   deps: Deps,
+  user: User,
   org_id: String,
 ) -> Promise(Response(ResponseBody)) {
-  case organization.new_id(org_id) {
-    Error(reason) ->
+  use oid <- guard.require_permission(deps, user, org_id, permission.SpaceRead)
+  let repo = space_repo.new(deps.db)
+  use result <- promise.map(list_organization_spaces.run(repo, oid))
+  case result {
+    Ok(spaces) -> reply.json_response(200, json.array(spaces, space_to_json))
+    Error(list_organization_spaces.RepoFailed(_)) ->
+      reply.json_response(500, error_json("could not list spaces"))
+  }
+}
+
+pub fn show(
+  deps: Deps,
+  user: User,
+  id: String,
+) -> Promise(Response(ResponseBody)) {
+  let repo = space_repo.new(deps.db)
+  use result <- promise.await(find_space.run(repo, id))
+  case result {
+    Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
+      promise.resolve(reply.json_response(404, error_json("space not found")))
+    Error(find_space.RepoFailed(_)) ->
       promise.resolve(reply.json_response(
-        422,
-        error_json(organization_error_message(reason)),
+        500,
+        error_json("could not load space"),
       ))
-    Ok(oid) -> {
-      let repo = space_repo.new(deps.db)
-      use result <- promise.map(list_organization_spaces.run(repo, oid))
-      case result {
-        Ok(spaces) ->
-          reply.json_response(200, json.array(spaces, space_to_json))
-        Error(list_organization_spaces.RepoFailed(_)) ->
-          reply.json_response(500, error_json("could not list spaces"))
-      }
+    Ok(s) -> {
+      use <- guard.require_permission_for_org(
+        deps,
+        user,
+        space.organization_id(s),
+        permission.SpaceRead,
+      )
+      promise.resolve(reply.json_response(200, space_to_json(s)))
     }
   }
 }
 
-/// `GET /spaces/:id` — a single space by id, or 404.
-pub fn show(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
-  let repo = space_repo.new(deps.db)
-  use result <- promise.map(find_space.run(repo, id))
-  case result {
-    Ok(s) -> reply.json_response(200, space_to_json(s))
-    Error(find_space.InvalidId(reason)) ->
-      reply.json_response(422, error_json(space_error_message(reason)))
-    Error(find_space.NotFound) ->
-      reply.json_response(404, error_json("space not found"))
-    Error(find_space.RepoFailed(_)) ->
-      reply.json_response(500, error_json("could not load space"))
-  }
-}
-
-/// `GET /spaces/:id/children` — the direct children of a space.
 pub fn list_children(
   deps: Deps,
+  user: User,
   id: String,
 ) -> Promise(Response(ResponseBody)) {
-  case space.new_id(id) {
-    Error(reason) ->
+  let repo = space_repo.new(deps.db)
+  use parent <- promise.await(find_space.run(repo, id))
+  case parent {
+    Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
+      promise.resolve(reply.json_response(404, error_json("space not found")))
+    Error(find_space.RepoFailed(_)) ->
       promise.resolve(reply.json_response(
-        422,
-        error_json(space_error_message(reason)),
+        500,
+        error_json("could not load space"),
       ))
-    Ok(sid) -> {
-      let repo = space_repo.new(deps.db)
-      use result <- promise.map(list_child_spaces.run(repo, sid))
+    Ok(p) -> {
+      use <- guard.require_permission_for_org(
+        deps,
+        user,
+        space.organization_id(p),
+        permission.SpaceRead,
+      )
+      use result <- promise.map(list_child_spaces.run(repo, space.id(p)))
       case result {
         Ok(children) ->
           reply.json_response(200, json.array(children, space_to_json))
@@ -103,39 +108,24 @@ pub fn list_children(
   }
 }
 
-/// `POST /organizations/:org_id/spaces` — create a space under an org.
 pub fn create(
   deps: Deps,
+  user: User,
   org_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  // Resolve the org first: validates the id and confirms it exists, so an
-  // unknown org is a clean 404 rather than a foreign-key 500 at save time.
-  let org_repo = organization_repo.new(deps.db)
-  use org_result <- promise.await(find_organization.run(org_repo, org_id))
-  case org_result {
-    Error(find_organization.InvalidId(reason)) ->
-      promise.resolve(reply.json_response(
-        422,
-        error_json(organization_error_message(reason)),
-      ))
-    Error(find_organization.NotFound) ->
-      promise.resolve(reply.json_response(
-        404,
-        error_json("organization not found"),
-      ))
-    Error(find_organization.RepoFailed(_)) ->
-      promise.resolve(reply.json_response(
-        500,
-        error_json("could not load organization"),
-      ))
-    Ok(org) -> create_under_org(deps, organization.id(org), req)
-  }
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.SpaceCreate,
+  )
+  create_under_org(deps, oid, req)
 }
 
 fn create_under_org(
   deps: Deps,
-  organization_id: organization.OrganizationId,
+  organization_id: OrganizationId,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
   use payload <- promise.await(conversation.read_json(req.body))
@@ -156,7 +146,7 @@ fn create_under_org(
 
 fn register(
   deps: Deps,
-  organization_id: organization.OrganizationId,
+  organization_id: OrganizationId,
   input: NewSpace,
 ) -> Promise(Response(ResponseBody)) {
   case parse_kind(input.kind), parse_parent(input.parent_id) {
@@ -244,7 +234,6 @@ fn error_response(error: CreateSpaceError) -> Response(ResponseBody) {
   case error {
     InvalidSpace(reason) ->
       reply.json_response(422, error_json(space_error_message(reason)))
-    // Don't leak whether a parent exists in another org.
     ParentNotFound | ParentDifferentOrganization ->
       reply.json_response(404, error_json("parent space not found"))
     ParentNotGrouping ->
@@ -262,13 +251,6 @@ fn space_error_message(error: space.SpaceError) -> String {
     space.EmptyId -> "id must not be empty"
     space.EmptyName -> "name must not be empty"
     space.EmptyLabel -> "label must not be empty"
-  }
-}
-
-fn organization_error_message(error: organization.OrganizationError) -> String {
-  case error {
-    organization.EmptyId -> "organization id must not be empty"
-    organization.EmptyName -> "organization name must not be empty"
   }
 }
 

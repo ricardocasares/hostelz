@@ -3,7 +3,7 @@
 
 import db/organization_repo
 import domain/organization
-import domain/organization_repo as port
+import domain/repo_error as port
 import domain/slug
 
 pub fn reconstruct_valid_row_test() {

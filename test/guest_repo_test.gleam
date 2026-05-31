@@ -6,7 +6,7 @@
 import db/guest_repo
 import domain/email
 import domain/guest
-import domain/guest_repo as port
+import domain/repo_error as port
 import domain/user
 import gleam/option.{None, Some}
 

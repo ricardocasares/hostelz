@@ -5,17 +5,8 @@
 
 import domain/guest.{type Guest, type GuestId}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  /// No guest exists for the given id.
-  NotFound
-  /// A stored row could not be turned back into a valid `Guest`: it failed the
-  /// domain's own validation on load (a corrupt or legacy row).
-  Corrupt(String)
-  /// The storage backend itself failed (connection, query, constraint, ...).
-  StorageError(String)
-}
 
 /// The guest repository, as a record of functions. Build one with an adapter
 /// such as `db/guest_repo.new`. Every operation is async (`Promise`) because the

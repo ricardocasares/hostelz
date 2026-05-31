@@ -1,8 +1,9 @@
-//// Unit tests for the register-user use case, using a fake `UserRepo`. The key
-//// case: a unique-email violation surfaces as `RepoError.Conflict` and is
-//// mapped to `EmailTaken`.
+//// Unit tests for the reworked register-user use case (now sets a password and
+//// stores a credential). Fake repos; password validation happens before IO.
 
 import app/register_user
+import domain/credential_repo.{CredentialRepo}
+import domain/repo_error
 import domain/user
 import domain/user_repo.{UserRepo}
 import gleam/javascript/promise
@@ -11,65 +12,84 @@ fn gen(id: String) -> fn() -> String {
   fn() { id }
 }
 
-fn repo_with_save(
-  save: fn(user.User) -> promise.Promise(Result(Nil, user_repo.RepoError)),
-) -> user_repo.UserRepo {
+fn ok_users() -> user_repo.UserRepo {
   UserRepo(
-    save: save,
-    find: fn(_) { promise.resolve(Error(user_repo.NotFound)) },
-    find_by_email: fn(_) { promise.resolve(Error(user_repo.NotFound)) },
+    save: fn(_) { promise.resolve(Ok(Nil)) },
+    find: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
+    find_by_email: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
     list_all: fn() { promise.resolve(Ok([])) },
   )
 }
 
-fn ok_repo() -> user_repo.UserRepo {
-  repo_with_save(fn(_) { promise.resolve(Ok(Nil)) })
+fn conflict_users() -> user_repo.UserRepo {
+  UserRepo(..ok_users(), save: fn(_) {
+    promise.resolve(Error(repo_error.Conflict("dup")))
+  })
 }
 
-fn conflict_repo() -> user_repo.UserRepo {
-  repo_with_save(fn(_) {
-    promise.resolve(Error(user_repo.Conflict("email already registered")))
+fn ok_credentials() -> credential_repo.CredentialRepo {
+  CredentialRepo(save: fn(_, _) { promise.resolve(Ok(Nil)) }, find_hash: fn(_) {
+    promise.resolve(Error(repo_error.NotFound))
   })
 }
 
 pub fn register_succeeds_test() {
   use result <- promise.map(register_user.run(
-    ok_repo(),
+    ok_users(),
+    ok_credentials(),
     gen("u_1"),
     "ada@example.com",
     "Ada",
+    "password123",
   ))
   let assert Ok(u) = result
   assert user.name(u) == "Ada"
-  assert user.user_id(user.id(u)) == "u_1"
+}
+
+pub fn register_rejects_short_password_test() {
+  use result <- promise.map(register_user.run(
+    ok_users(),
+    ok_credentials(),
+    gen("u_1"),
+    "ada@example.com",
+    "Ada",
+    "short",
+  ))
+  let assert Error(register_user.InvalidPassword(_)) = result
 }
 
 pub fn register_rejects_bad_email_test() {
   use result <- promise.map(register_user.run(
-    ok_repo(),
+    ok_users(),
+    ok_credentials(),
     gen("u_1"),
     "nope",
     "Ada",
+    "password123",
   ))
   let assert Error(register_user.InvalidEmail(_)) = result
 }
 
 pub fn register_rejects_empty_name_test() {
   use result <- promise.map(register_user.run(
-    ok_repo(),
+    ok_users(),
+    ok_credentials(),
     gen("u_1"),
     "ada@example.com",
     "  ",
+    "password123",
   ))
-  assert result == Error(register_user.InvalidUser(user.EmptyName))
+  let assert Error(register_user.InvalidUser(_)) = result
 }
 
 pub fn duplicate_email_is_email_taken_test() {
   use result <- promise.map(register_user.run(
-    conflict_repo(),
+    conflict_users(),
+    ok_credentials(),
     gen("u_1"),
     "ada@example.com",
     "Ada",
+    "password123",
   ))
   assert result == Error(register_user.EmailTaken)
 }

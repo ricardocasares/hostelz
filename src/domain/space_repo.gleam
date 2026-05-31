@@ -3,17 +3,9 @@
 //// `db/space_repo`, backed by Postgres — build a value of this type.
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/space.{type Space, type SpaceId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  /// No space exists for the given id.
-  NotFound
-  /// A stored row could not be turned back into a valid `Space`.
-  Corrupt(String)
-  /// The storage backend itself failed (connection, query, ...).
-  StorageError(String)
-}
 
 pub type SpaceRepo {
   SpaceRepo(

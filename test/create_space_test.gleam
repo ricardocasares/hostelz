@@ -4,6 +4,7 @@
 
 import app/create_space
 import domain/organization
+import domain/repo_error
 import domain/space
 import domain/space_repo.{SpaceRepo}
 import gleam/javascript/promise
@@ -19,7 +20,7 @@ fn an_org_id() -> organization.OrganizationId {
 }
 
 fn repo_finding(
-  found: fn() -> Result(space.Space, space_repo.RepoError),
+  found: fn() -> Result(space.Space, repo_error.RepoError),
 ) -> space_repo.SpaceRepo {
   SpaceRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
@@ -30,7 +31,7 @@ fn repo_finding(
 }
 
 fn no_parent_repo() -> space_repo.SpaceRepo {
-  repo_finding(fn() { Error(space_repo.NotFound) })
+  repo_finding(fn() { Error(repo_error.NotFound) })
 }
 
 fn grouping_space(org: organization.OrganizationId, id: String) -> space.Space {

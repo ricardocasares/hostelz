@@ -6,8 +6,9 @@
 //// the repo.
 
 import domain/guest.{type Guest}
-import domain/guest_repo.{type GuestRepo, type RepoError}
+import domain/guest_repo.{type GuestRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 
