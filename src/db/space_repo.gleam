@@ -43,8 +43,18 @@ fn save(conn: db.Connection, s: Space) -> Promise(Result(Nil, RepoError)) {
         is_grouping,
         label,
         name,
+        space.is_bookable(s),
       )
-    None -> queries.insert_space(conn, id, org, is_grouping, label, name)
+    None ->
+      queries.insert_space(
+        conn,
+        id,
+        org,
+        is_grouping,
+        label,
+        name,
+        space.is_bookable(s),
+      )
   }
   use res <- promise.map(saved)
   res
@@ -65,6 +75,7 @@ fn find(conn: db.Connection, id: SpaceId) -> Promise(Result(Space, RepoError)) {
         row.is_grouping,
         row.label,
         row.name,
+        row.bookable,
       )
   }
 }
@@ -88,6 +99,7 @@ fn list_by_organization(
           row.is_grouping,
           row.label,
           row.name,
+          row.bookable,
         )
       })
   }
@@ -112,6 +124,7 @@ fn list_children(
           row.is_grouping,
           row.label,
           row.name,
+          row.bookable,
         )
       })
   }
@@ -127,6 +140,7 @@ pub fn reconstruct(
   is_grouping: Bool,
   label: String,
   name: String,
+  bookable: Bool,
 ) -> Result(Space, RepoError) {
   use sid <- result.try(space.new_id(id) |> result.map_error(corrupt))
   use org_id <- result.try(
@@ -134,7 +148,8 @@ pub fn reconstruct(
   )
   use pid <- result.try(reconstruct_parent_id(parent_id))
   use kind <- result.try(reconstruct_kind(is_grouping, label))
-  space.new(sid, org_id, pid, kind, name) |> result.map_error(corrupt)
+  space.new(sid, org_id, pid, kind, name, bookable)
+  |> result.map_error(corrupt)
 }
 
 fn reconstruct_parent_id(

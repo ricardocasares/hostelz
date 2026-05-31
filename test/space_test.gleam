@@ -50,32 +50,52 @@ pub fn grouping_is_a_grouping_test() {
   assert space.kind_label(k) == "room"
 }
 
+// --- bookability ---
+
+pub fn default_bookable_unit_is_true_test() {
+  assert space.default_bookable(a_unit()) == True
+}
+
+pub fn default_bookable_grouping_is_false_test() {
+  assert space.default_bookable(a_grouping()) == False
+}
+
+pub fn set_bookable_overrides_test() {
+  let assert Ok(id) = space.new_id("sp_1")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), None, a_grouping(), "Room", False)
+  assert space.is_bookable(s) == False
+  assert space.is_bookable(space.set_bookable(s, True)) == True
+}
+
 // --- construction ---
 
 pub fn new_root_space_is_accepted_test() {
   let assert Ok(id) = space.new_id("sp_1")
   let assert Ok(s) =
-    space.new(id, an_org_id(), None, a_grouping(), "Main Hostel")
+    space.new(id, an_org_id(), None, a_grouping(), "Main Hostel", False)
   assert space.name(s) == "Main Hostel"
   assert space.parent_id(s) == None
 }
 
 pub fn new_space_trims_name_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  let assert Ok(s) = space.new(id, an_org_id(), None, a_grouping(), "  Main  ")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), None, a_grouping(), "  Main  ", False)
   assert space.name(s) == "Main"
 }
 
 pub fn empty_name_is_rejected_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  assert space.new(id, an_org_id(), None, a_grouping(), "  ")
+  assert space.new(id, an_org_id(), None, a_grouping(), "  ", False)
     == Error(space.EmptyName)
 }
 
 pub fn nested_space_keeps_its_parent_test() {
   let assert Ok(pid) = space.new_id("sp_parent")
   let assert Ok(id) = space.new_id("sp_child")
-  let assert Ok(s) = space.new(id, an_org_id(), Some(pid), a_unit(), "Bed 1")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), Some(pid), a_unit(), "Bed 1", True)
   assert space.parent_id(s) == Some(pid)
 }
 
@@ -84,9 +104,10 @@ pub fn nested_space_keeps_its_parent_test() {
 pub fn only_groupings_can_contain_children_test() {
   let assert Ok(g_id) = space.new_id("sp_g")
   let assert Ok(grouping) =
-    space.new(g_id, an_org_id(), None, a_grouping(), "Room")
+    space.new(g_id, an_org_id(), None, a_grouping(), "Room", False)
   let assert Ok(u_id) = space.new_id("sp_u")
-  let assert Ok(unit) = space.new(u_id, an_org_id(), None, a_unit(), "Bed")
+  let assert Ok(unit) =
+    space.new(u_id, an_org_id(), None, a_unit(), "Bed", True)
   assert space.can_contain(grouping) == True
   assert space.can_contain(unit) == False
 }
@@ -95,15 +116,18 @@ pub fn only_groupings_can_contain_children_test() {
 
 pub fn rename_revalidates_name_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  let assert Ok(s) = space.new(id, an_org_id(), None, a_grouping(), "Room")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), None, a_grouping(), "Room", True)
   assert space.rename(s, "  ") == Error(space.EmptyName)
   let assert Ok(renamed) = space.rename(s, "Room A")
   assert space.name(renamed) == "Room A"
+  assert space.is_bookable(renamed) == True
 }
 
 pub fn reparent_sets_parent_and_keeps_identity_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  let assert Ok(s) = space.new(id, an_org_id(), None, a_grouping(), "Room")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), None, a_grouping(), "Room", False)
   let assert Ok(pid) = space.new_id("sp_parent")
   let moved = space.reparent(s, Some(pid))
   assert space.parent_id(moved) == Some(pid)
@@ -114,7 +138,7 @@ pub fn reparent_sets_parent_and_keeps_identity_test() {
 
 pub fn same_space_compares_by_id_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  let assert Ok(a) = space.new(id, an_org_id(), None, a_grouping(), "A")
-  let assert Ok(b) = space.new(id, an_org_id(), None, a_unit(), "B")
+  let assert Ok(a) = space.new(id, an_org_id(), None, a_grouping(), "A", False)
+  let assert Ok(b) = space.new(id, an_org_id(), None, a_unit(), "B", True)
   assert space.same_space(a, b)
 }

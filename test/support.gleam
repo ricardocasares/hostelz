@@ -60,7 +60,7 @@ pub fn authed(
 pub fn truncate(conn: db.Connection) -> Promise(Nil) {
   use _ <- promise.map(
     db.query(
-      "truncate table memberships, role_permissions, roles, sessions, user_credentials, spaces, guests, organizations, users cascade",
+      "truncate table booking_demand, booking_items, bookings, memberships, role_permissions, roles, sessions, user_credentials, spaces, guests, organizations, users cascade",
     )
     |> db.returning(decode.dynamic)
     |> db.execute(conn),

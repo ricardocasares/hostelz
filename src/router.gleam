@@ -15,6 +15,7 @@ import gleam/http/response.{type Response}
 import gleam/javascript/promise.{type Promise}
 import log
 import router/auth
+import router/bookings
 import router/context.{type Deps}
 import router/guard
 import router/guests
@@ -106,9 +107,24 @@ fn dispatch(
     Post, ["organizations", oid, "spaces"] ->
       spaces.create(deps, user, oid, req)
 
+    Get, ["organizations", oid, "bookings"] -> bookings.list(deps, user, oid)
+    Post, ["organizations", oid, "bookings"] ->
+      bookings.create(deps, user, oid, req)
+    Get, ["organizations", oid, "room-types", "available"] ->
+      bookings.available_room_types(deps, user, oid, req)
+    Get, ["organizations", oid, "room-types", sid, "availability"] ->
+      bookings.room_type_availability(deps, user, oid, sid, req)
+
     Get, ["guests", id] -> guests.show(deps, user, id)
     Get, ["spaces", id] -> spaces.show(deps, user, id)
     Get, ["spaces", id, "children"] -> spaces.list_children(deps, user, id)
+    Put, ["spaces", id, "parent"] -> spaces.reparent(deps, user, id, req)
+    Put, ["spaces", id, "bookable"] -> spaces.set_bookable(deps, user, id, req)
+
+    Get, ["bookings", id] -> bookings.show(deps, user, id)
+    Put, ["bookings", id, "status"] -> bookings.transition(deps, user, id, req)
+    Put, ["bookings", id, "items", item, "assignment"] ->
+      bookings.assign(deps, user, id, item, req)
 
     _, _ -> promise.resolve(reply.text(405, "Method not allowed"))
   }

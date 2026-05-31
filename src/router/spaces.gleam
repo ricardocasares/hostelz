@@ -13,7 +13,10 @@ import app/create_space.{
 import app/find_space
 import app/list_child_spaces
 import app/list_organization_spaces
+import app/move_space
+import app/set_space_bookable
 import conversation.{type RequestBody, type ResponseBody}
+import db/booking_repo
 import db/space_repo
 import domain/organization.{type OrganizationId}
 import domain/permission
@@ -30,7 +33,13 @@ import router/guard
 import router/reply
 
 type NewSpace {
-  NewSpace(name: String, kind: String, label: String, parent_id: Option(String))
+  NewSpace(
+    name: String,
+    kind: String,
+    label: String,
+    parent_id: Option(String),
+    bookable: Option(Bool),
+  )
 }
 
 pub fn list_for_org(
@@ -164,6 +173,7 @@ fn register(
         is_grouping,
         input.label,
         input.name,
+        input.bookable,
       ))
       case result {
         Ok(saved) -> reply.json_response(201, space_to_json(saved))
@@ -201,7 +211,154 @@ fn new_space_decoder() -> decode.Decoder(NewSpace) {
     None,
     decode.optional(decode.string),
   )
-  decode.success(NewSpace(name:, kind:, label:, parent_id:))
+  use bookable <- decode.optional_field(
+    "bookable",
+    None,
+    decode.optional(decode.bool),
+  )
+  decode.success(NewSpace(name:, kind:, label:, parent_id:, bookable:))
+}
+
+pub fn reparent(
+  deps: Deps,
+  user: User,
+  id: String,
+  req: Request(RequestBody),
+) -> Promise(Response(ResponseBody)) {
+  let repo = space_repo.new(deps.db)
+  use found <- promise.await(find_space.run(repo, id))
+  case found {
+    Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
+      promise.resolve(reply.json_response(404, error_json("space not found")))
+    Error(find_space.RepoFailed(_)) ->
+      promise.resolve(reply.json_response(
+        500,
+        error_json("could not load space"),
+      ))
+    Ok(sp) -> {
+      use <- guard.require_permission_for_org(
+        deps,
+        user,
+        space.organization_id(sp),
+        permission.SpaceUpdate,
+      )
+      use payload <- promise.await(conversation.read_json(req.body))
+      case payload {
+        Error(_) ->
+          promise.resolve(reply.json_response(400, error_json("invalid JSON")))
+        Ok(data) ->
+          case decode.run(data, parent_decoder()) {
+            Error(_) ->
+              promise.resolve(reply.json_response(
+                422,
+                error_json("expected an optional \"parent_id\" string"),
+              ))
+            Ok(parent_id) -> {
+              use result <- promise.map(move_space.run(
+                repo,
+                booking_repo.new(deps.db),
+                id,
+                parent_id,
+              ))
+              case result {
+                Ok(moved) -> reply.json_response(200, space_to_json(moved))
+                Error(move_space.HasActiveReservations) ->
+                  reply.json_response(
+                    409,
+                    error_json("space has active bookings"),
+                  )
+                Error(move_space.WouldCreateCycle) ->
+                  reply.json_response(
+                    422,
+                    error_json("cannot move a space under itself"),
+                  )
+                Error(move_space.ParentNotGrouping) ->
+                  reply.json_response(
+                    422,
+                    error_json("parent space cannot contain children"),
+                  )
+                Error(move_space.ParentNotFound)
+                | Error(move_space.ParentDifferentOrganization) ->
+                  reply.json_response(404, error_json("parent space not found"))
+                Error(move_space.NotFound) | Error(move_space.InvalidId(_)) ->
+                  reply.json_response(404, error_json("space not found"))
+                Error(move_space.RepoFailed(_)) ->
+                  reply.json_response(500, error_json("could not move space"))
+              }
+            }
+          }
+      }
+    }
+  }
+}
+
+pub fn set_bookable(
+  deps: Deps,
+  user: User,
+  id: String,
+  req: Request(RequestBody),
+) -> Promise(Response(ResponseBody)) {
+  let repo = space_repo.new(deps.db)
+  use found <- promise.await(find_space.run(repo, id))
+  case found {
+    Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
+      promise.resolve(reply.json_response(404, error_json("space not found")))
+    Error(find_space.RepoFailed(_)) ->
+      promise.resolve(reply.json_response(
+        500,
+        error_json("could not load space"),
+      ))
+    Ok(sp) -> {
+      use <- guard.require_permission_for_org(
+        deps,
+        user,
+        space.organization_id(sp),
+        permission.SpaceUpdate,
+      )
+      use payload <- promise.await(conversation.read_json(req.body))
+      case payload {
+        Error(_) ->
+          promise.resolve(reply.json_response(400, error_json("invalid JSON")))
+        Ok(data) ->
+          case decode.run(data, bookable_decoder()) {
+            Error(_) ->
+              promise.resolve(reply.json_response(
+                422,
+                error_json("expected a \"bookable\" boolean"),
+              ))
+            Ok(bookable) -> {
+              use result <- promise.map(set_space_bookable.run(
+                repo,
+                id,
+                bookable,
+              ))
+              case result {
+                Ok(updated) -> reply.json_response(200, space_to_json(updated))
+                Error(set_space_bookable.NotFound)
+                | Error(set_space_bookable.InvalidId(_)) ->
+                  reply.json_response(404, error_json("space not found"))
+                Error(set_space_bookable.RepoFailed(_)) ->
+                  reply.json_response(500, error_json("could not update space"))
+              }
+            }
+          }
+      }
+    }
+  }
+}
+
+fn parent_decoder() -> decode.Decoder(Option(String)) {
+  use parent_id <- decode.optional_field(
+    "parent_id",
+    None,
+    decode.optional(decode.string),
+  )
+  decode.success(parent_id)
+}
+
+fn bookable_decoder() -> decode.Decoder(Bool) {
+  use bookable <- decode.field("bookable", decode.bool)
+  decode.success(bookable)
 }
 
 fn space_to_json(s: Space) -> json.Json {
@@ -220,6 +377,7 @@ fn space_to_json(s: Space) -> json.Json {
     #("kind", json.string(kind_to_string(s))),
     #("label", json.string(space.kind_label(space.kind(s)))),
     #("name", json.string(space.name(s))),
+    #("bookable", json.bool(space.is_bookable(s))),
   ])
 }
 

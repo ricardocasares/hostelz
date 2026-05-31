@@ -14,3 +14,10 @@ pub fn unknown_permission_is_error_test() {
 pub fn catalog_is_non_empty_test() {
   assert permission.catalog != []
 }
+
+pub fn booking_permissions_present_test() {
+  assert list.contains(permission.catalog, permission.BookingCreate)
+  assert permission.to_string(permission.BookingRead) == "booking:read"
+  assert permission.from_string("booking:update")
+    == Ok(permission.BookingUpdate)
+}

@@ -58,6 +58,7 @@ pub fn space_tree_round_trip_test() {
     True,
     "hostel",
     "Main Hostel",
+    None,
   ))
   let assert Ok(hostel) = r1
 
@@ -70,6 +71,7 @@ pub fn space_tree_round_trip_test() {
     True,
     "room",
     "Room 1",
+    None,
   ))
   let assert Ok(room) = r2
 
@@ -82,6 +84,7 @@ pub fn space_tree_round_trip_test() {
     False,
     "bed",
     "Bed 1",
+    None,
   ))
   let assert Ok(bed) = r3
 
@@ -121,6 +124,7 @@ pub fn cannot_nest_under_a_unit_test() {
     False,
     "bed",
     "Bed",
+    None,
   ))
   let assert Ok(bed) = r1
 
@@ -133,6 +137,7 @@ pub fn cannot_nest_under_a_unit_test() {
     False,
     "bed",
     "Sub",
+    None,
   ))
   assert r2 == Error(create_space.ParentNotGrouping)
 }

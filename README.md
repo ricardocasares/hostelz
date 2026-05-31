@@ -22,7 +22,9 @@ DDD layering under `src/`:
 - `router/` — HTTP routing, request context, replies
 - `api.gleam` / `api.ts` — server entry (a Bun `fetch` handler)
 
-Aggregates: **Organization** (a tenant; unique URL `slug`), **User** (a system account; unique email, argon2id password in a separate `user_credentials`), **Guest**, **Space**, plus the authz aggregates **Role** and **Membership**. A guest **belongs to an organization** (mandatory) and **may be linked to a user** (optional — walk-ins have no account). A **Space** is the bookable inventory: a tree (adjacency list via a nullable `parent_id`) of either a `unit` (an atomic sleepable leaf — bed, bunk, private room) or a `grouping` (room, dorm, cabin, hostel, …); both carry a free-form `label`. Any space is bookable; only a grouping may contain children. Each aggregate holds the other's id as a value object, never the whole aggregate. (Bookings/availability are not built yet.)
+Aggregates: **Organization** (a tenant; unique URL `slug`), **User** (a system account; unique email, argon2id password in a separate `user_credentials`), **Guest**, **Space**, **Booking**, plus the authz aggregates **Role** and **Membership**. A guest **belongs to an organization** (mandatory) and **may be linked to a user** (optional — walk-ins have no account). A **Space** is the inventory: a tree (adjacency list via a nullable `parent_id`) of either a `unit` (an atomic sleepable leaf — bed, bunk, private room) or a `grouping` (room, dorm, cabin, hostel, …); both carry a free-form `label`. A space has an owner-controlled `bookable` flag (units default bookable, a grouping is opted in to sell it whole); only a grouping may contain children. Each aggregate holds the other's id as a value object, never the whole aggregate.
+
+A **Booking** (root) holds one or more **BookingItems**, each claiming space for a nightly period `[check_in, check_out)`, for an optional guest (none = a maintenance/blocking hold). An item is either *pinned* to a specific space (a bed, or a room booked whole) or an *unassigned hold* against a one-level room-type (the physical bed is chosen at check-in via the assignment route — **true deferred** dorm inventory). Oversell is prevented two ways: a partial `EXCLUDE` (gist, on `btree_gist`) makes two pins on the same node over overlapping dates impossible, and a per-room-type **capacity count** (bookable leaf children) is enforced in the create/assign use cases under a per-org `pg_advisory_xact_lock`. Availability is reported as beds-left per room-type. Booking lifecycle: `Pending | Confirmed | CheckedIn | CheckedOut | Cancelled | NoShow`; blocking statuses hold inventory, terminal ones free it.
 
 ## Authentication & authorization
 
@@ -45,8 +47,16 @@ All routes are under `/api`. Bodies and responses are JSON; ids are server-minte
 | `GET/POST /organizations/:id/members`, `PUT/DELETE …/members/:uid` | `{email, role_id}` / `{role_id}` | `member:read`/`create`/`update`/`delete`; last-Owner removal/demotion refused |
 | `GET/POST /organizations/:id/guests` | `{name, email, user_id?}` | `guest:read` / `guest:create` |
 | `GET /guests/:id` | — | `guest:read` on its org |
-| `GET/POST /organizations/:id/spaces` | `{name, kind, label, parent_id?}` | `space:read` / `space:create` |
+| `GET/POST /organizations/:id/spaces` | `{name, kind, label, parent_id?, bookable?}` | `space:read` / `space:create` |
 | `GET /spaces/:id` · `/children` | — | `space:read` on its org |
+| `PUT /spaces/:id/parent` | `{parent_id?}` | `space:update`; reparent (409 if the space has active bookings) |
+| `PUT /spaces/:id/bookable` | `{bookable}` | `space:update`; toggle bookability |
+| `GET/POST /organizations/:id/bookings` | `{guest_id?, items:[{kind,space_id,check_in,check_out}]}` | `booking:read` / `booking:create`; `kind` is `whole` or `unit`; 409 over-capacity/unavailable |
+| `GET /bookings/:id` | — | `booking:read` on its org (returns items) |
+| `PUT /bookings/:id/status` | `{status}` | `booking:update`; 409 invalid transition |
+| `PUT /bookings/:id/items/:item/assignment` | `{space_id?}` | `booking:update`; assign a bed at check-in (auto-picks if omitted) |
+| `GET /organizations/:id/room-types/available?from=&to=` | — | `booking:read`; beds-left per room-type |
+| `GET /organizations/:id/room-types/:sid/availability?from=&to=` | — | `booking:read`; beds-left for one room-type |
 
 Slug and email uniqueness are enforced by database unique indexes (surfaced as `409`), not read-then-write checks.
 
