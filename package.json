@@ -12,7 +12,7 @@
     "build:db": "bun db migrate",
     "build:vite": "vite build",
     "build:gleam": "gleam build",
-    "build:api": "bun build src/api.ts --outfile api/index.js --target bun",
+    "build:api": "bun build src/api.ts --outfile dist/api/index.js --target bun",
     "db": "graphile-migrate",
     "test": "run-s test:*",
     "test:db": "bun --env-file=.env.test db migrate",
