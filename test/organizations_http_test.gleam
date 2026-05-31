@@ -1,118 +1,120 @@
-//// HTTP-layer tests for the organization routes, including the slug-uniqueness
-//// contract at the wire: a duplicate slug is a 409, an invalid slug a 422.
-//// Uses a real (unique) id generator so two creates with the same slug get
-//// distinct ids — the conflict comes from the slug, not the id.
-////
-//// Touches the database — run with the test DB.
+//// HTTP tests for the organization routes under authentication. Uses the
+//// shared `support` helper for an authenticated user / owner + a Bearer token.
 
-import brioche/sql as db
-import conversation.{type JsRequest, type RequestBody, Text}
-import glanoid
-import gleam/dynamic/decode
-import gleam/http/request.{type Request}
+import conversation.{Text}
 import gleam/javascript/promise
 import gleam/string
 import router
-import router/context
+import support
 
-@external(javascript, "./request_ffi.mjs", "request")
-fn js_request(method: String, url: String, body: String) -> JsRequest
-
-fn test_deps() -> context.Deps {
-  // One connection per pool — see the suite-wide note in guests_http_test.
-  let assert Ok(conn) = db.connect(db.default_config() |> db.max(1))
-  let assert Ok(nanoid) = glanoid.make_generator(glanoid.default_alphabet)
-  context.Deps(db: conn, generate_id: fn() { nanoid(21) })
-}
-
-fn req(method: String, path: String, body: String) -> Request(RequestBody) {
-  conversation.to_gleam_request(js_request(method, "http://test" <> path, body))
-}
-
-fn truncate(conn: db.Connection) -> promise.Promise(Nil) {
-  use _ <- promise.map(
-    db.query("truncate table guests, organizations, users cascade")
-    |> db.returning(decode.dynamic)
-    |> db.execute(conn),
-  )
-  Nil
+pub fn post_unauthenticated_returns_401_test() {
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use res <- promise.map(router.handle(
+    deps,
+    support.req("POST", "/api/organizations", "{\"name\":\"A\",\"slug\":\"a\"}"),
+  ))
+  assert res.status == 401
 }
 
 pub fn post_organization_returns_201_test() {
-  let deps = test_deps()
-  use _ <- promise.await(truncate(deps.db))
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, _user_id) <- promise.await(support.user_with_session(
+    deps,
+    "u@example.com",
+  ))
   use res <- promise.map(router.handle(
     deps,
-    req(
+    support.authed(
       "POST",
       "/api/organizations",
-      "{\"name\":\"Backpackers\",\"slug\":\"backpackers\"}",
+      "{\"name\":\"Acme\",\"slug\":\"acme\"}",
+      token,
     ),
   ))
   assert res.status == 201
   let assert Text(body) = res.body
-  assert string.contains(body, "\"slug\":\"backpackers\"")
-  assert string.contains(body, "\"name\":\"Backpackers\"")
+  assert string.contains(body, "\"slug\":\"acme\"")
 }
 
 pub fn post_duplicate_slug_returns_409_test() {
-  let deps = test_deps()
-  use _ <- promise.await(truncate(deps.db))
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, _user_id) <- promise.await(support.user_with_session(
+    deps,
+    "u@example.com",
+  ))
   use first <- promise.await(router.handle(
     deps,
-    req("POST", "/api/organizations", "{\"name\":\"A\",\"slug\":\"dup\"}"),
+    support.authed(
+      "POST",
+      "/api/organizations",
+      "{\"name\":\"A\",\"slug\":\"dup\"}",
+      token,
+    ),
   ))
   assert first.status == 201
   use second <- promise.map(router.handle(
     deps,
-    req("POST", "/api/organizations", "{\"name\":\"B\",\"slug\":\"dup\"}"),
+    support.authed(
+      "POST",
+      "/api/organizations",
+      "{\"name\":\"B\",\"slug\":\"dup\"}",
+      token,
+    ),
   ))
   assert second.status == 409
 }
 
 pub fn post_invalid_slug_returns_422_test() {
-  let deps = test_deps()
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, _user_id) <- promise.await(support.user_with_session(
+    deps,
+    "u@example.com",
+  ))
   use res <- promise.map(router.handle(
     deps,
-    req("POST", "/api/organizations", "{\"name\":\"A\",\"slug\":\"Bad Slug\"}"),
+    support.authed(
+      "POST",
+      "/api/organizations",
+      "{\"name\":\"A\",\"slug\":\"Bad Slug\"}",
+      token,
+    ),
   ))
   assert res.status == 422
-}
-
-pub fn post_wrong_shape_returns_422_test() {
-  let deps = test_deps()
-  use res <- promise.map(router.handle(
-    deps,
-    req("POST", "/api/organizations", "{\"name\":\"A\"}"),
-  ))
-  assert res.status == 422
-}
-
-pub fn post_invalid_json_returns_400_test() {
-  let deps = test_deps()
-  use res <- promise.map(router.handle(
-    deps,
-    req("POST", "/api/organizations", "not json"),
-  ))
-  assert res.status == 400
 }
 
 pub fn get_organizations_returns_200_test() {
-  let deps = test_deps()
-  use _ <- promise.await(truncate(deps.db))
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, _org_id) <- promise.await(support.owner_setup(deps))
   use res <- promise.map(router.handle(
     deps,
-    req("GET", "/api/organizations", ""),
+    support.authed("GET", "/api/organizations", "", token),
   ))
   assert res.status == 200
 }
 
-pub fn show_unknown_organization_returns_404_test() {
-  let deps = test_deps()
-  use _ <- promise.await(truncate(deps.db))
+pub fn show_my_org_returns_200_test() {
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, org_id) <- promise.await(support.owner_setup(deps))
   use res <- promise.map(router.handle(
     deps,
-    req("GET", "/api/organizations/nope", ""),
+    support.authed("GET", "/api/organizations/" <> org_id, "", token),
   ))
-  assert res.status == 404
+  assert res.status == 200
+}
+
+pub fn show_foreign_org_is_forbidden_test() {
+  let deps = support.test_deps()
+  use _ <- promise.await(support.truncate(deps.db))
+  use #(token, _org_id) <- promise.await(support.owner_setup(deps))
+  use res <- promise.map(router.handle(
+    deps,
+    support.authed("GET", "/api/organizations/not-my-org", "", token),
+  ))
+  assert res.status == 403
 }

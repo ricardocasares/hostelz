@@ -5,6 +5,7 @@
 
 import domain/organization.{type Organization, type OrganizationId}
 import domain/slug.{type Slug}
+import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 
 pub type RepoError {
@@ -25,5 +26,7 @@ pub type OrganizationRepo {
     find: fn(OrganizationId) -> Promise(Result(Organization, RepoError)),
     find_by_slug: fn(Slug) -> Promise(Result(Organization, RepoError)),
     list_all: fn() -> Promise(Result(List(Organization), RepoError)),
+    /// Organizations the given user is a member of (joins memberships).
+    list_for_user: fn(UserId) -> Promise(Result(List(Organization), RepoError)),
   )
 }
