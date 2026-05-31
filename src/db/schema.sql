@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hcXEkFUn8sIksCVyfm2h0y7fv7UP6Af7Y3dN8ZBedVtZDNAkGZRiX4RhGEhH1VA
+\restrict sy03SXkwyNl7nyMsAdj68aTW028EneoO8S4EGUUl9wuh9qAZ0CEFXRCKotVB0Vb
 
 -- Dumped from database version 18.4 (Postgres.app)
 -- Dumped by pg_dump version 18.4 (Postgres.app)
@@ -19,9 +19,66 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: booking_demand; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.booking_demand (
+    booking_item_id text NOT NULL,
+    space_id text NOT NULL,
+    period daterange NOT NULL,
+    is_pin boolean NOT NULL
+);
+
+
+--
+-- Name: booking_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.booking_items (
+    id text NOT NULL,
+    booking_id text NOT NULL,
+    period daterange NOT NULL,
+    kind text NOT NULL,
+    target_space_id text NOT NULL,
+    assigned_space_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT booking_items_period_not_empty CHECK ((NOT isempty(period)))
+);
+
+
+--
+-- Name: bookings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bookings (
+    id text NOT NULL,
+    organization_id text NOT NULL,
+    guest_id text,
+    status text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 
 --
 -- Name: guests; Type: TABLE; Schema: public; Owner: -
@@ -113,7 +170,8 @@ CREATE TABLE public.spaces (
     label text NOT NULL,
     name text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    bookable boolean NOT NULL
 );
 
 
@@ -140,6 +198,30 @@ CREATE TABLE public.users (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: booking_demand booking_demand_no_overlap; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_demand
+    ADD CONSTRAINT booking_demand_no_overlap EXCLUDE USING gist (space_id WITH =, period WITH &&) WHERE (is_pin);
+
+
+--
+-- Name: booking_items booking_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_items
+    ADD CONSTRAINT booking_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bookings bookings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bookings
+    ADD CONSTRAINT bookings_pkey PRIMARY KEY (id);
 
 
 --
@@ -215,6 +297,34 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: booking_demand_space_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX booking_demand_space_id_idx ON public.booking_demand USING btree (space_id);
+
+
+--
+-- Name: booking_items_booking_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX booking_items_booking_id_idx ON public.booking_items USING btree (booking_id);
+
+
+--
+-- Name: bookings_guest_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bookings_guest_id_idx ON public.bookings USING btree (guest_id);
+
+
+--
+-- Name: bookings_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bookings_organization_id_idx ON public.bookings USING btree (organization_id);
+
+
+--
 -- Name: guests_organization_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -282,6 +392,62 @@ CREATE INDEX spaces_parent_id_idx ON public.spaces USING btree (parent_id);
 --
 
 CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email);
+
+
+--
+-- Name: booking_demand booking_demand_booking_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_demand
+    ADD CONSTRAINT booking_demand_booking_item_id_fkey FOREIGN KEY (booking_item_id) REFERENCES public.booking_items(id) ON DELETE CASCADE;
+
+
+--
+-- Name: booking_demand booking_demand_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_demand
+    ADD CONSTRAINT booking_demand_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.spaces(id);
+
+
+--
+-- Name: booking_items booking_items_assigned_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_items
+    ADD CONSTRAINT booking_items_assigned_space_id_fkey FOREIGN KEY (assigned_space_id) REFERENCES public.spaces(id);
+
+
+--
+-- Name: booking_items booking_items_booking_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_items
+    ADD CONSTRAINT booking_items_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id) ON DELETE CASCADE;
+
+
+--
+-- Name: booking_items booking_items_target_space_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.booking_items
+    ADD CONSTRAINT booking_items_target_space_id_fkey FOREIGN KEY (target_space_id) REFERENCES public.spaces(id);
+
+
+--
+-- Name: bookings bookings_guest_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bookings
+    ADD CONSTRAINT bookings_guest_id_fkey FOREIGN KEY (guest_id) REFERENCES public.guests(id);
+
+
+--
+-- Name: bookings bookings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bookings
+    ADD CONSTRAINT bookings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
@@ -376,5 +542,5 @@ ALTER TABLE ONLY public.user_credentials
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hcXEkFUn8sIksCVyfm2h0y7fv7UP6Af7Y3dN8ZBedVtZDNAkGZRiX4RhGEhH1VA
+\unrestrict sy03SXkwyNl7nyMsAdj68aTW028EneoO8S4EGUUl9wuh9qAZ0CEFXRCKotVB0Vb
 

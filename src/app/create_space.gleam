@@ -30,9 +30,18 @@ pub fn run(
   is_grouping: Bool,
   label: String,
   name: String,
+  bookable: Option(Bool),
 ) -> Promise(Result(Space, CreateSpaceError)) {
   case
-    build(generate_id(), organization_id, parent_id, is_grouping, label, name)
+    build(
+      generate_id(),
+      organization_id,
+      parent_id,
+      is_grouping,
+      label,
+      name,
+      bookable,
+    )
   {
     Error(error) -> promise.resolve(Error(error))
     Ok(new_space) -> {
@@ -63,10 +72,12 @@ fn build(
   is_grouping: Bool,
   label: String,
   name: String,
+  bookable: Option(Bool),
 ) -> Result(Space, CreateSpaceError) {
   use kind <- result.try(build_kind(is_grouping, label))
   use sid <- result.try(space.new_id(id) |> result.map_error(InvalidSpace))
-  space.new(sid, organization_id, parent_id, kind, name)
+  let bookable = option.unwrap(bookable, space.default_bookable(kind))
+  space.new(sid, organization_id, parent_id, kind, name, bookable)
   |> result.map_error(InvalidSpace)
 }
 

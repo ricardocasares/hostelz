@@ -22,6 +22,7 @@ pub opaque type Space {
     parent_id: Option(SpaceId),
     kind: Kind,
     name: String,
+    bookable: Bool,
   )
 }
 
@@ -59,10 +60,21 @@ pub fn new(
   parent_id: Option(SpaceId),
   kind: Kind,
   name: String,
+  bookable: Bool,
 ) -> Result(Space, SpaceError) {
   case string.trim(name) {
     "" -> Error(EmptyName)
-    trimmed -> Ok(Space(id, organization_id, parent_id, kind, trimmed))
+    trimmed ->
+      Ok(Space(id, organization_id, parent_id, kind, trimmed, bookable))
+  }
+}
+
+/// The sensible default bookability for a new space: units are bookable, a
+/// grouping is not (an owner opts a grouping in to sell it as a whole).
+pub fn default_bookable(kind: Kind) -> Bool {
+  case kind {
+    Unit(_) -> True
+    Grouping(_) -> False
   }
 }
 
@@ -91,6 +103,14 @@ pub fn name(space: Space) -> String {
   space.name
 }
 
+pub fn is_bookable(space: Space) -> Bool {
+  space.bookable
+}
+
+pub fn set_bookable(space: Space, bookable: Bool) -> Space {
+  Space(..space, bookable:)
+}
+
 pub fn kind_label(kind: Kind) -> String {
   case kind {
     Unit(label) -> label
@@ -114,7 +134,14 @@ pub fn can_contain(parent: Space) -> Bool {
 
 // state transitions return new immutable values (same identity)
 pub fn rename(space: Space, new_name: String) -> Result(Space, SpaceError) {
-  new(space.id, space.organization_id, space.parent_id, space.kind, new_name)
+  new(
+    space.id,
+    space.organization_id,
+    space.parent_id,
+    space.kind,
+    new_name,
+    space.bookable,
+  )
 }
 
 pub fn reparent(space: Space, new_parent: Option(SpaceId)) -> Space {

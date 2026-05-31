@@ -24,6 +24,10 @@ pub type Permission {
   GuestRead
   GuestUpdate
   GuestDelete
+  BookingCreate
+  BookingRead
+  BookingUpdate
+  BookingDelete
 }
 
 /// Every permission — for validation and for listing the catalog over the wire.
@@ -47,6 +51,10 @@ pub const catalog: List(Permission) = [
   GuestRead,
   GuestUpdate,
   GuestDelete,
+  BookingCreate,
+  BookingRead,
+  BookingUpdate,
+  BookingDelete,
 ]
 
 pub fn to_string(permission: Permission) -> String {
@@ -70,6 +78,10 @@ pub fn to_string(permission: Permission) -> String {
     GuestRead -> "guest:read"
     GuestUpdate -> "guest:update"
     GuestDelete -> "guest:delete"
+    BookingCreate -> "booking:create"
+    BookingRead -> "booking:read"
+    BookingUpdate -> "booking:update"
+    BookingDelete -> "booking:delete"
   }
 }
 
@@ -94,6 +106,10 @@ pub fn from_string(raw: String) -> Result(Permission, Nil) {
     "guest:read" -> Ok(GuestRead)
     "guest:update" -> Ok(GuestUpdate)
     "guest:delete" -> Ok(GuestDelete)
+    "booking:create" -> Ok(BookingCreate)
+    "booking:read" -> Ok(BookingRead)
+    "booking:update" -> Ok(BookingUpdate)
+    "booking:delete" -> Ok(BookingDelete)
     _ -> Error(Nil)
   }
 }

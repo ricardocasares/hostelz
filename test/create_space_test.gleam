@@ -1,6 +1,7 @@
 //// Unit tests for the create-space use case with a fake `SpaceRepo`. Covers the
 //// parent rules the domain can't self-check (the child only holds parent_id):
-//// the parent must exist, be a grouping, and share the organization.
+//// the parent must exist, be a grouping, and share the organization. Also covers
+//// the bookability default and override.
 
 import app/create_space
 import domain/organization
@@ -37,14 +38,14 @@ fn no_parent_repo() -> space_repo.SpaceRepo {
 fn grouping_space(org: organization.OrganizationId, id: String) -> space.Space {
   let assert Ok(sid) = space.new_id(id)
   let assert Ok(k) = space.grouping("room")
-  let assert Ok(s) = space.new(sid, org, None, k, "Room")
+  let assert Ok(s) = space.new(sid, org, None, k, "Room", False)
   s
 }
 
 fn unit_space(org: organization.OrganizationId, id: String) -> space.Space {
   let assert Ok(sid) = space.new_id(id)
   let assert Ok(k) = space.unit("bed")
-  let assert Ok(s) = space.new(sid, org, None, k, "Bed")
+  let assert Ok(s) = space.new(sid, org, None, k, "Bed", True)
   s
 }
 
@@ -57,10 +58,56 @@ pub fn create_root_succeeds_test() {
     True,
     "hostel",
     "Main",
+    None,
   ))
   let assert Ok(s) = result
   assert space.name(s) == "Main"
   assert space.parent_id(s) == None
+}
+
+pub fn create_grouping_defaults_not_bookable_test() {
+  use result <- promise.map(create_space.run(
+    no_parent_repo(),
+    gen("sp_1"),
+    an_org_id(),
+    None,
+    True,
+    "hostel",
+    "Main",
+    None,
+  ))
+  let assert Ok(s) = result
+  assert space.is_bookable(s) == False
+}
+
+pub fn create_unit_defaults_bookable_test() {
+  use result <- promise.map(create_space.run(
+    no_parent_repo(),
+    gen("sp_1"),
+    an_org_id(),
+    None,
+    False,
+    "bed",
+    "Bed",
+    None,
+  ))
+  let assert Ok(s) = result
+  assert space.is_bookable(s) == True
+}
+
+pub fn create_honours_explicit_bookable_test() {
+  use result <- promise.map(create_space.run(
+    no_parent_repo(),
+    gen("sp_1"),
+    an_org_id(),
+    None,
+    True,
+    "room",
+    "Private",
+    Some(True),
+  ))
+  let assert Ok(s) = result
+  assert space.is_bookable(s) == True
 }
 
 pub fn create_child_under_grouping_succeeds_test() {
@@ -74,6 +121,7 @@ pub fn create_child_under_grouping_succeeds_test() {
     False,
     "bed",
     "Bed 1",
+    None,
   ))
   let assert Ok(s) = result
   assert space.parent_id(s) == Some(pid)
@@ -90,6 +138,7 @@ pub fn create_child_under_unit_is_rejected_test() {
     False,
     "bed",
     "Bed 2",
+    None,
   ))
   assert result == Error(create_space.ParentNotGrouping)
 }
@@ -104,6 +153,7 @@ pub fn create_child_missing_parent_is_rejected_test() {
     False,
     "bed",
     "Bed",
+    None,
   ))
   assert result == Error(create_space.ParentNotFound)
 }
@@ -120,6 +170,7 @@ pub fn create_child_in_different_org_is_rejected_test() {
     False,
     "bed",
     "Bed",
+    None,
   ))
   assert result == Error(create_space.ParentDifferentOrganization)
 }
@@ -133,6 +184,7 @@ pub fn create_rejects_empty_label_test() {
     True,
     "  ",
     "Main",
+    None,
   ))
   assert result == Error(create_space.InvalidSpace(space.EmptyLabel))
 }
@@ -146,6 +198,7 @@ pub fn create_rejects_empty_name_test() {
     True,
     "hostel",
     "  ",
+    None,
   ))
   assert result == Error(create_space.InvalidSpace(space.EmptyName))
 }
