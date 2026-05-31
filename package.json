@@ -11,7 +11,7 @@
     "build": "run-s build:*",
     "build:db": "bun db migrate",
     "build:vite": "vite build",
-    "build:api": "bun build api/index.ts --target bun --outfile api/index.js",
+    "build:api": "bun build src/api.ts --target bun --outfile api/index.js",
     "build:gleam": "gleam build",
     "db": "graphile-migrate",
     "test": "run-s test:*",
