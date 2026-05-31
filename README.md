@@ -22,6 +22,28 @@ DDD layering under `src/`:
 - `router/` — HTTP routing, request context, replies
 - `api.gleam` / `api.ts` — server entry (a Bun `fetch` handler)
 
+Aggregates: **Organization** (a tenant; has a unique URL `slug`), **User** (a system account; unique email), **Guest**, and **Space**. A guest **belongs to an organization** (mandatory) and **may be linked to a user** (optional — walk-ins have no account). A **Space** is the bookable inventory: a tree (adjacency list via a nullable `parent_id`) of either a `unit` (an atomic sleepable leaf — bed, bunk, private room) or a `grouping` (room, dorm, cabin, hostel, …); both carry a free-form `label`. Any space is bookable; only a grouping may contain children. Each aggregate holds the other's id as a value object, never the whole aggregate. (Bookings/availability are not built yet.)
+
+## HTTP API
+
+All routes are under `/api`. Bodies and responses are JSON; ids are server-minted.
+
+| Method & path | Body | Notes |
+| --- | --- | --- |
+| `POST /organizations` | `{name, slug}` | 201; 409 if the slug is taken, 422 if invalid |
+| `GET /organizations` | — | list, newest first |
+| `GET /organizations/:id` | — | one, or 404 |
+| `POST /users` | `{email, name}` | 201; 409 if the email is taken |
+| `GET /users` · `GET /users/:id` | — | list / one |
+| `POST /organizations/:org_id/guests` | `{name, email, user_id?}` | 201; `user_id` optional (omit for a walk-in); 404 if the org or user is unknown |
+| `GET /organizations/:org_id/guests` | — | the org's guests |
+| `GET /guests/:id` | — | one, or 404 |
+| `POST /organizations/:org_id/spaces` | `{name, kind, label, parent_id?}` | 201; `kind` is `"unit"`/`"grouping"`; omit `parent_id` for a root; 404 unknown org/parent; 422 if the parent is a unit (can't contain children) |
+| `GET /organizations/:org_id/spaces` | — | the org's spaces (flat; build the tree from `parent_id`) |
+| `GET /spaces/:id` · `GET /spaces/:id/children` | — | one / its direct children |
+
+Slug uniqueness and email uniqueness are enforced by database unique indexes (surfaced as `409`), not read-then-write checks.
+
 ## Setup
 
 ```sh

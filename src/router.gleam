@@ -11,7 +11,10 @@ import gleam/io
 import gleam/javascript/promise.{type Promise}
 import router/context.{type Deps}
 import router/guests
+import router/organizations
 import router/reply
+import router/spaces
+import router/users
 
 /// The middleware stack, followed by dispatch. Each `use` wraps everything
 /// below it, so the block after the middleware *is* the handler they wrap.
@@ -39,9 +42,19 @@ pub fn handle(
   // `Promise` directly; the 405 fallback is synchronous, wrapped by the single
   // `promise.resolve`.
   case req.method, segments {
-    Get, ["guests"] -> guests.list(deps)
+    Get, ["organizations"] -> organizations.list(deps)
+    Post, ["organizations"] -> organizations.create(deps, req)
+    Get, ["organizations", id] -> organizations.show(deps, id)
+    Get, ["organizations", oid, "guests"] -> guests.list_for_org(deps, oid)
+    Post, ["organizations", oid, "guests"] -> guests.create(deps, oid, req)
+    Get, ["organizations", oid, "spaces"] -> spaces.list_for_org(deps, oid)
+    Post, ["organizations", oid, "spaces"] -> spaces.create(deps, oid, req)
+    Get, ["users"] -> users.list(deps)
+    Post, ["users"] -> users.create(deps, req)
+    Get, ["users", id] -> users.show(deps, id)
     Get, ["guests", id] -> guests.show(deps, id)
-    Post, ["guests"] -> guests.create(deps, req)
+    Get, ["spaces", id] -> spaces.show(deps, id)
+    Get, ["spaces", id, "children"] -> spaces.list_children(deps, id)
     _, _ -> promise.resolve(reply.text(405, "Method not allowed"))
   }
 }
