@@ -8,7 +8,10 @@
 import domain/email
 import domain/guest.{type Guest}
 import domain/guest_repo.{type GuestRepo, type RepoError}
+import domain/organization.{type OrganizationId}
+import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
+import gleam/option.{type Option}
 import gleam/result
 
 pub type RegisterGuestError {
@@ -18,16 +21,19 @@ pub type RegisterGuestError {
 }
 
 /// Mint an id with `generate_id`, validate `name` and `raw_email`, build a
-/// `Guest`, and save it. Returns the stored guest on success. The id generator
-/// is injected (rather than called here directly) so the use case stays pure to
-/// test — pass a fixed stub in tests, a real nanoid generator in production.
+/// `Guest` belonging to `organization_id` (optionally linked to `user_id`), and
+/// save it. The owning org and the optional user link are already-validated
+/// value objects supplied by the boundary; a `None` user is a walk-in. The id
+/// generator is injected so the use case stays pure to test.
 pub fn run(
   repo: GuestRepo,
   generate_id: fn() -> String,
+  organization_id: OrganizationId,
+  user_id: Option(UserId),
   name: String,
   raw_email: String,
 ) -> Promise(Result(Guest, RegisterGuestError)) {
-  case build(generate_id(), name, raw_email) {
+  case build(generate_id(), organization_id, user_id, name, raw_email) {
     Error(error) -> promise.resolve(Error(error))
     Ok(new_guest) -> {
       use saved <- promise.map(repo.save(new_guest))
@@ -42,6 +48,8 @@ pub fn run(
 /// error. No IO — kept separate from `run` so the rules are trivially testable.
 fn build(
   id: String,
+  organization_id: OrganizationId,
+  user_id: Option(UserId),
   name: String,
   raw_email: String,
 ) -> Result(Guest, RegisterGuestError) {
@@ -49,5 +57,6 @@ fn build(
   use address <- result.try(
     email.new(raw_email) |> result.map_error(InvalidEmail),
   )
-  guest.new(gid, name, address) |> result.map_error(InvalidGuest)
+  guest.new(gid, organization_id, user_id, name, address)
+  |> result.map_error(InvalidGuest)
 }

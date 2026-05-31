@@ -4,6 +4,7 @@
 //// domain and use cases never import a database library.
 
 import domain/guest.{type Guest, type GuestId}
+import domain/organization.{type OrganizationId}
 import gleam/javascript/promise.{type Promise}
 
 pub type RepoError {
@@ -23,6 +24,7 @@ pub type GuestRepo {
   GuestRepo(
     save: fn(Guest) -> Promise(Result(Nil, RepoError)),
     find: fn(GuestId) -> Promise(Result(Guest, RepoError)),
-    list_all: fn() -> Promise(Result(List(Guest), RepoError)),
+    list_by_organization: fn(OrganizationId) ->
+      Promise(Result(List(Guest), RepoError)),
   )
 }
