@@ -12,9 +12,8 @@ import domain/user.{type User}
 import gleam/http.{Delete, Get, Post, Put}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
-import gleam/int
-import gleam/io
 import gleam/javascript/promise.{type Promise}
+import log
 import router/auth
 import router/context.{type Deps}
 import router/guard
@@ -29,7 +28,25 @@ pub fn handle(
   deps: Deps,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  use <- log_request(req)
+  // Correlate every log line for this request; honour an inbound id for tracing.
+  let request_id = case request.get_header(req, "x-request-id") {
+    Ok(id) -> id
+    Error(Nil) -> deps.generate_id()
+  }
+  // Rebind the process-wide logger with this request's context, so handlers log
+  // with request_id/method/path for free via `deps.logger`.
+  let deps =
+    context.Deps(
+      ..deps,
+      logger: log.with(deps.logger, [
+        log.string("request_id", request_id),
+        log.string("method", http.method_to_string(req.method)),
+        log.string("path", req.path),
+      ]),
+    )
+
+  use <- log_request(deps.logger)
+  use <- set_request_id(request_id)
   use <- default_headers()
 
   // Requests arrive under the `/api` prefix, so drop it and route on
@@ -99,15 +116,28 @@ fn dispatch(
 
 // --- Middleware ------------------------------------------------------------
 
-/// Logs the method and path before the handler runs, and the status after.
+/// Logs the request before the handler runs, and the response (with status)
+/// after. `logger` already carries request_id/method/path.
 fn log_request(
-  req: Request(RequestBody),
+  logger: log.Logger,
   handler: fn() -> Promise(Response(ResponseBody)),
 ) -> Promise(Response(ResponseBody)) {
-  io.println(http.method_to_string(req.method) <> " " <> req.path)
+  log.info(logger, "request received")
   use res <- promise.map(handler())
-  io.println("-> " <> int.to_string(res.status))
+  log.info(
+    log.with(logger, [log.int("status", res.status)]),
+    "request completed",
+  )
   res
+}
+
+/// Echoes the request id back so clients/traces can correlate.
+fn set_request_id(
+  request_id: String,
+  handler: fn() -> Promise(Response(ResponseBody)),
+) -> Promise(Response(ResponseBody)) {
+  use res <- promise.map(handler())
+  response.set_header(res, "x-request-id", request_id)
 }
 
 /// Adds a header to every response once the handler has produced one.

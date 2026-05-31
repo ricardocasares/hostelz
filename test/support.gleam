@@ -19,6 +19,7 @@ import glanoid
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/javascript/promise.{type Promise}
+import log
 import router/context
 
 @external(javascript, "./request_ffi.mjs", "request")
@@ -35,7 +36,7 @@ fn js_authed_request(
 pub fn test_deps() -> context.Deps {
   let assert Ok(conn) = db.connect(db.default_config() |> db.max(1))
   let assert Ok(nanoid) = glanoid.make_generator(glanoid.default_alphabet)
-  context.Deps(db: conn, generate_id: fn() { nanoid(21) })
+  context.Deps(db: conn, generate_id: fn() { nanoid(21) }, logger: log.null())
 }
 
 pub fn req(method: String, path: String, body: String) -> Request(RequestBody) {
