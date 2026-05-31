@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "run-p -l dev:*",
-    "dev:api": "bun --watch api/index.ts",
+    "dev:api": "bun --watch src/api.ts",
     "dev:test": "find test/*.gleam src/*.gleam | entr gleam test",
     "dev:vite": "vite",
     "build": "run-s build:*",
