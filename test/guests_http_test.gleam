@@ -75,7 +75,7 @@ pub fn post_bad_email_returns_422_test() {
 pub fn wrong_method_returns_405_test() {
   use res <- promise.map(router.handle(
     test_deps(),
-    req("GET", "/api/guests", ""),
+    req("DELETE", "/api/guests", ""),
   ))
   assert res.status == 405
 }
