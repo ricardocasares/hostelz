@@ -3,7 +3,7 @@
 //// thing the entrypoint needs to know about.
 
 import conversation.{type RequestBody, type ResponseBody}
-import gleam/http.{Post}
+import gleam/http.{Get, Post}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
@@ -35,11 +35,13 @@ pub fn handle(
     segments -> segments
   }
 
-  // The guests handler reads the body / awaits the database, so it returns a
+  // The guests handlers read the body / await the database, so they return a
   // `Promise` directly; the 405 fallback is synchronous, wrapped by the single
   // `promise.resolve`.
   case req.method, segments {
-    Post, ["guests"] -> guests.handle(deps, req)
+    Get, ["guests"] -> guests.list(deps)
+    Get, ["guests", id] -> guests.show(deps, id)
+    Post, ["guests"] -> guests.create(deps, req)
     _, _ -> promise.resolve(reply.text(405, "Method not allowed"))
   }
 }

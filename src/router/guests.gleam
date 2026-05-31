@@ -1,12 +1,18 @@
-//// `POST /guests` — register a guest from a JSON body `{"name","email"}`. The
-//// id is minted server-side (see `router/context`), so clients don't supply it.
+//// The guests HTTP handlers — pure translation between the wire and the
+//// `register_guest` / `list_guests` / `find_guest` use cases.
 ////
-//// The HTTP boundary is pure translation: decode the input, call the
-//// `register_guest` use case, then map its result onto a status code. Each
-//// use-case error variant has a home — domain validation failures are the
+//// `POST /guests` (`create`) registers a guest from a JSON body
+//// `{"name","email"}`; the id is minted server-side (see `router/context`), so
+//// clients don't supply it. `GET /guests` (`list`) returns every guest as a
+//// JSON array, newest first. `GET /guests/:id` (`show`) returns a single guest,
+//// or 404 if none exists.
+////
+//// Each use-case error variant has a home — domain validation failures are the
 //// client's fault (422) and say which rule broke; a repository failure is ours
-//// (500) and stays opaque. The domain and use case know nothing about HTTP.
+//// (500) and stays opaque. The domain and use cases know nothing about HTTP.
 
+import app/find_guest
+import app/list_guests
 import app/register_guest.{
   type RegisterGuestError, InvalidEmail, InvalidGuest, RepoFailed,
 }
@@ -27,7 +33,34 @@ type NewGuest {
   NewGuest(name: String, email: String)
 }
 
-pub fn handle(
+/// `GET /guests` — every guest as a JSON array, newest first.
+pub fn list(deps: Deps) -> Promise(Response(ResponseBody)) {
+  let repo = guest_repo.new(deps.db)
+  use result <- promise.map(list_guests.run(repo))
+  case result {
+    Ok(guests) -> reply.json_response(200, json.array(guests, guest_to_json))
+    Error(list_guests.RepoFailed(_)) ->
+      reply.json_response(500, error_json("could not list guests"))
+  }
+}
+
+/// `GET /guests/:id` — a single guest by id, or 404 if none exists.
+pub fn show(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
+  let repo = guest_repo.new(deps.db)
+  use result <- promise.map(find_guest.run(repo, id))
+  case result {
+    Ok(g) -> reply.json_response(200, guest_to_json(g))
+    Error(find_guest.InvalidId(reason)) ->
+      reply.json_response(422, error_json(guest_error_message(reason)))
+    Error(find_guest.NotFound) ->
+      reply.json_response(404, error_json("guest not found"))
+    Error(find_guest.RepoFailed(_)) ->
+      reply.json_response(500, error_json("could not load guest"))
+  }
+}
+
+/// `POST /guests` — register a guest from a JSON body `{"name","email"}`.
+pub fn create(
   deps: Deps,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
