@@ -12,6 +12,7 @@ import domain/role_repo.{type RoleRepo}
 import domain/user
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
+import gleam/result
 
 pub type AddMemberError {
   InvalidEmail(email.EmailError)
@@ -86,10 +87,7 @@ fn add(
       let assert Ok(id) = membership.new_id(generate_id())
       let member = membership.new(id, organization_id, user_id, role_id)
       use saved <- promise.map(membership_repo.save(member))
-      case saved {
-        Ok(Nil) -> Ok(member)
-        Error(e) -> Error(RepoFailed(e))
-      }
+      saved |> result.replace(member) |> result.map_error(RepoFailed)
     }
     Error(other) -> promise.resolve(Error(RepoFailed(other)))
   }

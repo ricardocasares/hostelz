@@ -18,6 +18,7 @@ import domain/space.{type SpaceId}
 import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/option.{type Option, None, Some}
+import gleam/result
 
 /// One requested item: `kind` is "whole" (pin the space) or "unit" (an
 /// unassigned hold against a room-type).
@@ -53,31 +54,23 @@ pub fn run(
   case items {
     [] -> promise.resolve(Error(NoItems))
     _ -> {
-      use checked_guest <- promise.await(check_guest(
+      use gid <- promise.try_await(check_guest(
         guest_repo,
         organization_id,
         guest_id,
       ))
-      case checked_guest {
-        Error(e) -> promise.resolve(Error(e))
-        Ok(gid) ->
-          case booking.new_id(generate_id()) {
-            Error(_) -> promise.resolve(Error(InvalidId))
-            Ok(bid) -> {
-              use built <- promise.await(build_items(
-                space_repo,
-                generate_id,
-                organization_id,
-                bid,
-                items,
-              ))
-              case built {
-                Error(e) -> promise.resolve(Error(e))
-                Ok(domain_items) ->
-                  persist(booking_repo, organization_id, gid, bid, domain_items)
-              }
-            }
-          }
+      case booking.new_id(generate_id()) {
+        Error(_) -> promise.resolve(Error(InvalidId))
+        Ok(bid) -> {
+          use domain_items <- promise.try_await(build_items(
+            space_repo,
+            generate_id,
+            organization_id,
+            bid,
+            items,
+          ))
+          persist(booking_repo, organization_id, gid, bid, domain_items)
+        }
       }
     }
   }
@@ -137,29 +130,21 @@ fn build_items(
   case items {
     [] -> promise.resolve(Ok([]))
     [item, ..rest] -> {
-      use first <- promise.await(build_item(
+      use bi <- promise.try_await(build_item(
         space_repo,
         generate_id,
         organization_id,
         bid,
         item,
       ))
-      case first {
-        Error(e) -> promise.resolve(Error(e))
-        Ok(bi) -> {
-          use more <- promise.map(build_items(
-            space_repo,
-            generate_id,
-            organization_id,
-            bid,
-            rest,
-          ))
-          case more {
-            Error(e) -> Error(e)
-            Ok(rest_items) -> Ok([bi, ..rest_items])
-          }
-        }
-      }
+      use rest_items <- promise.map_try(build_items(
+        space_repo,
+        generate_id,
+        organization_id,
+        bid,
+        rest,
+      ))
+      Ok([bi, ..rest_items])
     }
   }
 }
@@ -197,17 +182,16 @@ fn finish_item(
   sp: space.Space,
   kind: String,
 ) -> Result(BookingItem, CreateBookingError) {
-  case booking_item.new_id(generate_id()) {
-    Error(_) -> Error(InvalidId)
-    Ok(iid) ->
-      case kind {
-        "whole" ->
-          case space.is_bookable(sp) {
-            False -> Error(NotBookable)
-            True -> Ok(booking_item.whole(iid, bid, p, sid))
-          }
-        "unit" -> Ok(booking_item.unit_in(iid, bid, p, sid))
-        other -> Error(InvalidKind(other))
+  use iid <- result.try(
+    booking_item.new_id(generate_id()) |> result.replace_error(InvalidId),
+  )
+  case kind {
+    "whole" ->
+      case space.is_bookable(sp) {
+        False -> Error(NotBookable)
+        True -> Ok(booking_item.whole(iid, bid, p, sid))
       }
+    "unit" -> Ok(booking_item.unit_in(iid, bid, p, sid))
+    other -> Error(InvalidKind(other))
   }
 }

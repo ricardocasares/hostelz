@@ -5,6 +5,7 @@ import domain/booking_item.{type BookingItem}
 import domain/booking_repo.{type BookingRepo}
 import domain/repo_error.{type RepoError}
 import gleam/javascript/promise.{type Promise}
+import gleam/result
 
 pub type FindBookingError {
   InvalidId
@@ -25,10 +26,9 @@ pub fn run(
         Error(other) -> promise.resolve(Error(RepoFailed(other)))
         Ok(bk) -> {
           use items <- promise.map(repo.list_items(bid))
-          case items {
-            Error(e) -> Error(RepoFailed(e))
-            Ok(list) -> Ok(#(bk, list))
-          }
+          items
+          |> result.map(fn(list) { #(bk, list) })
+          |> result.map_error(RepoFailed)
         }
       }
     }

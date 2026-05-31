@@ -8,6 +8,7 @@ import domain/session_repo.{type SessionRepo}
 import domain/user.{type User}
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
+import gleam/result
 
 pub type AuthError {
   InvalidSession
@@ -24,12 +25,9 @@ pub fn run(
     Error(repo_error.NotFound) -> promise.resolve(Error(InvalidSession))
     Error(other) -> promise.resolve(Error(RepoFailed(other)))
     Ok(user_id) -> {
+      // A session pointing at a missing user is treated as invalid.
       use user <- promise.map(user_repo.find(user_id))
-      case user {
-        Ok(u) -> Ok(u)
-        // A session pointing at a missing user is treated as invalid.
-        Error(_) -> Error(InvalidSession)
-      }
+      user |> result.replace_error(InvalidSession)
     }
   }
 }

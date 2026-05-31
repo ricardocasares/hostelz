@@ -11,6 +11,7 @@ import domain/session_repo.{type SessionRepo}
 import domain/user.{type User}
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
+import gleam/result
 
 pub type LoginError {
   InvalidCredentials
@@ -64,10 +65,7 @@ fn verify_and_issue(
             token.hash(raw),
             user.id(user),
           ))
-          case saved {
-            Ok(Nil) -> Ok(#(raw, user))
-            Error(e) -> Error(RepoFailed(e))
-          }
+          saved |> result.replace(#(raw, user)) |> result.map_error(RepoFailed)
         }
       }
     }
