@@ -1,5 +1,5 @@
 # gleam
-/api
+/api/*.js
 *.beam
 *.ez
 /build
