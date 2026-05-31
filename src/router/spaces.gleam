@@ -55,7 +55,8 @@ pub fn list_for_org(
       let repo = space_repo.new(deps.db)
       use result <- promise.map(list_organization_spaces.run(repo, oid))
       case result {
-        Ok(spaces) -> reply.json_response(200, json.array(spaces, space_to_json))
+        Ok(spaces) ->
+          reply.json_response(200, json.array(spaces, space_to_json))
         Error(list_organization_spaces.RepoFailed(_)) ->
           reply.json_response(500, error_json("could not list spaces"))
       }
@@ -79,7 +80,10 @@ pub fn show(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
 }
 
 /// `GET /spaces/:id/children` — the direct children of a space.
-pub fn list_children(deps: Deps, id: String) -> Promise(Response(ResponseBody)) {
+pub fn list_children(
+  deps: Deps,
+  id: String,
+) -> Promise(Response(ResponseBody)) {
   case space.new_id(id) {
     Error(reason) ->
       promise.resolve(reply.json_response(
@@ -143,9 +147,7 @@ fn create_under_org(
         Error(_) ->
           promise.resolve(reply.json_response(
             422,
-            error_json(
-              "expected \"name\", \"kind\" and \"label\" strings",
-            ),
+            error_json("expected \"name\", \"kind\" and \"label\" strings"),
           ))
         Ok(input) -> register(deps, organization_id, input)
       }
@@ -158,8 +160,10 @@ fn register(
   input: NewSpace,
 ) -> Promise(Response(ResponseBody)) {
   case parse_kind(input.kind), parse_parent(input.parent_id) {
-    Error(message), _ -> promise.resolve(reply.json_response(422, error_json(message)))
-    _, Error(message) -> promise.resolve(reply.json_response(422, error_json(message)))
+    Error(message), _ ->
+      promise.resolve(reply.json_response(422, error_json(message)))
+    _, Error(message) ->
+      promise.resolve(reply.json_response(422, error_json(message)))
     Ok(is_grouping), Ok(parent_id) -> {
       let repo = space_repo.new(deps.db)
       use result <- promise.map(create_space.run(

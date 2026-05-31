@@ -39,7 +39,14 @@ fn save(conn: db.Connection, g: Guest) -> Promise(Result(Nil, RepoError)) {
   let mail = email.to_string(guest.email(g))
   let saved = case guest.user_id(g) {
     Some(uid) ->
-      queries.insert_guest_with_user(conn, id, org, user.user_id(uid), name, mail)
+      queries.insert_guest_with_user(
+        conn,
+        id,
+        org,
+        user.user_id(uid),
+        name,
+        mail,
+      )
     None -> queries.insert_guest(conn, id, org, name, mail)
   }
   use res <- promise.map(saved)

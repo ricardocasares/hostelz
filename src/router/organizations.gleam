@@ -127,8 +127,7 @@ fn organization_error_message(error: organization.OrganizationError) -> String {
 fn slug_error_message(error: slug.SlugError) -> String {
   case error {
     slug.Empty -> "slug must not be empty"
-    slug.Invalid ->
-      "slug must be lowercase letters, numbers and single hyphens"
+    slug.Invalid -> "slug must be lowercase letters, numbers and single hyphens"
   }
 }
 

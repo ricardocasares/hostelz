@@ -28,7 +28,10 @@ pub fn new(conn: db.Connection) -> OrganizationRepo {
   )
 }
 
-fn save(conn: db.Connection, o: Organization) -> Promise(Result(Nil, RepoError)) {
+fn save(
+  conn: db.Connection,
+  o: Organization,
+) -> Promise(Result(Nil, RepoError)) {
   use res <- promise.map(queries.insert_organization(
     conn,
     organization.organization_id(organization.id(o)),

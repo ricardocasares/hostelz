@@ -33,10 +33,7 @@ fn no_parent_repo() -> space_repo.SpaceRepo {
   repo_finding(fn() { Error(space_repo.NotFound) })
 }
 
-fn grouping_space(
-  org: organization.OrganizationId,
-  id: String,
-) -> space.Space {
+fn grouping_space(org: organization.OrganizationId, id: String) -> space.Space {
   let assert Ok(sid) = space.new_id(id)
   let assert Ok(k) = space.grouping("room")
   let assert Ok(s) = space.new(sid, org, None, k, "Room")

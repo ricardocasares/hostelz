@@ -54,7 +54,8 @@ pub fn grouping_is_a_grouping_test() {
 
 pub fn new_root_space_is_accepted_test() {
   let assert Ok(id) = space.new_id("sp_1")
-  let assert Ok(s) = space.new(id, an_org_id(), None, a_grouping(), "Main Hostel")
+  let assert Ok(s) =
+    space.new(id, an_org_id(), None, a_grouping(), "Main Hostel")
   assert space.name(s) == "Main Hostel"
   assert space.parent_id(s) == None
 }
@@ -82,7 +83,8 @@ pub fn nested_space_keeps_its_parent_test() {
 
 pub fn only_groupings_can_contain_children_test() {
   let assert Ok(g_id) = space.new_id("sp_g")
-  let assert Ok(grouping) = space.new(g_id, an_org_id(), None, a_grouping(), "Room")
+  let assert Ok(grouping) =
+    space.new(g_id, an_org_id(), None, a_grouping(), "Room")
   let assert Ok(u_id) = space.new_id("sp_u")
   let assert Ok(unit) = space.new(u_id, an_org_id(), None, a_unit(), "Bed")
   assert space.can_contain(grouping) == True

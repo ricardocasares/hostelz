@@ -187,10 +187,7 @@ pub fn get_org_guests_returns_200_test() {
 pub fn show_unknown_guest_returns_404_test() {
   let deps = test_deps()
   use _ <- promise.await(truncate(deps.db))
-  use res <- promise.map(router.handle(
-    deps,
-    req("GET", "/api/guests/nope", ""),
-  ))
+  use res <- promise.map(router.handle(deps, req("GET", "/api/guests/nope", "")))
   assert res.status == 404
 }
 

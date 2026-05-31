@@ -30,11 +30,16 @@ pub fn run(
   label: String,
   name: String,
 ) -> Promise(Result(Space, CreateSpaceError)) {
-  case build(generate_id(), organization_id, parent_id, is_grouping, label, name)
+  case
+    build(generate_id(), organization_id, parent_id, is_grouping, label, name)
   {
     Error(error) -> promise.resolve(Error(error))
     Ok(new_space) -> {
-      use checked <- promise.await(check_parent(repo, organization_id, parent_id))
+      use checked <- promise.await(check_parent(
+        repo,
+        organization_id,
+        parent_id,
+      ))
       case checked {
         Error(error) -> promise.resolve(Error(error))
         Ok(Nil) -> {

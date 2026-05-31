@@ -107,9 +107,9 @@ fn error_response(error: RegisterUserError) -> Response(ResponseBody) {
       reply.json_response(422, error_json(user_error_message(reason)))
     InvalidEmail(reason) ->
       reply.json_response(422, error_json(email_error_message(reason)))
-    EmailTaken -> reply.json_response(409, error_json("email already registered"))
-    RepoFailed(_) ->
-      reply.json_response(500, error_json("could not save user"))
+    EmailTaken ->
+      reply.json_response(409, error_json("email already registered"))
+    RepoFailed(_) -> reply.json_response(500, error_json("could not save user"))
   }
 }
 

@@ -106,9 +106,6 @@ pub fn get_users_returns_200_test() {
 pub fn show_unknown_user_returns_404_test() {
   let deps = test_deps()
   use _ <- promise.await(truncate(deps.db))
-  use res <- promise.map(router.handle(
-    deps,
-    req("GET", "/api/users/nope", ""),
-  ))
+  use res <- promise.map(router.handle(deps, req("GET", "/api/users/nope", "")))
   assert res.status == 404
 }

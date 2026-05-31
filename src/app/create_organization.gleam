@@ -45,7 +45,9 @@ fn build(
   use oid <- result.try(
     organization.new_id(id) |> result.map_error(InvalidOrganization),
   )
-  use org_slug <- result.try(slug.new(raw_slug) |> result.map_error(InvalidSlug))
+  use org_slug <- result.try(
+    slug.new(raw_slug) |> result.map_error(InvalidSlug),
+  )
   organization.new(oid, org_slug, name)
   |> result.map_error(InvalidOrganization)
 }

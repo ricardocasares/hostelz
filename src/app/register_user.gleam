@@ -6,7 +6,7 @@
 
 import domain/email
 import domain/user.{type User}
-import domain/user_repo.{type UserRepo, type RepoError}
+import domain/user_repo.{type RepoError, type UserRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 

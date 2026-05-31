@@ -49,7 +49,11 @@ fn seed_org(conn: db.Connection) -> promise.Promise(Nil) {
   Nil
 }
 
-fn seed_space(conn: db.Connection, id: String, is_grouping: Bool) -> promise.Promise(Nil) {
+fn seed_space(
+  conn: db.Connection,
+  id: String,
+  is_grouping: Bool,
+) -> promise.Promise(Nil) {
   let repo = space_repo.new(conn)
   let assert Ok(oid) = organization.new_id("org_http_sp")
   let assert Ok(sid) = space.new_id(id)

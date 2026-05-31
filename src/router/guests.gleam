@@ -57,7 +57,8 @@ pub fn list_for_org(
       let repo = guest_repo.new(deps.db)
       use result <- promise.map(list_organization_guests.run(repo, oid))
       case result {
-        Ok(guests) -> reply.json_response(200, json.array(guests, guest_to_json))
+        Ok(guests) ->
+          reply.json_response(200, json.array(guests, guest_to_json))
         Error(list_organization_guests.RepoFailed(_)) ->
           reply.json_response(500, error_json("could not list guests"))
       }
@@ -201,9 +202,7 @@ fn guest_to_json(g: Guest) -> json.Json {
     ),
     #(
       "user_id",
-      json.nullable(guest.user_id(g), fn(uid) {
-        json.string(user.user_id(uid))
-      }),
+      json.nullable(guest.user_id(g), fn(uid) { json.string(user.user_id(uid)) }),
     ),
     #("name", json.string(guest.name(g))),
     #("email", json.string(email.to_string(guest.email(g)))),
