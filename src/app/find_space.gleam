@@ -1,8 +1,9 @@
 //// Application use case: find a space by id. A "no such space" repo failure is
 //// lifted to its own `NotFound` variant so the HTTP boundary can answer 404.
 
+import domain/repo_error.{type RepoError}
 import domain/space.{type Space}
-import domain/space_repo.{type RepoError, type SpaceRepo}
+import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 
@@ -27,7 +28,7 @@ pub fn run(
 
 fn to_error(error: RepoError) -> FindSpaceError {
   case error {
-    space_repo.NotFound -> NotFound
+    repo_error.NotFound -> NotFound
     other -> RepoFailed(other)
   }
 }

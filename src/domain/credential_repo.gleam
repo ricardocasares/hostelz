@@ -1,13 +1,9 @@
 //// Persistence port for a user's password hash (kept separate from the `User`
 //// identity aggregate). The hash is an opaque string produced by `auth/password`.
 
+import domain/repo_error.{type RepoError}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  NotFound
-  StorageError(String)
-}
 
 pub type CredentialRepo {
   CredentialRepo(

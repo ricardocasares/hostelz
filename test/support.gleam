@@ -15,10 +15,10 @@ import db/user_repo
 import domain/email
 import domain/organization
 import domain/user
+import glanoid
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/javascript/promise.{type Promise}
-import glanoid
 import router/context
 
 @external(javascript, "./request_ffi.mjs", "request")

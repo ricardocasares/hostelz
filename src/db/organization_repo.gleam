@@ -9,9 +9,9 @@
 import brioche/sql as db
 import db/sql as queries
 import domain/organization.{type Organization, type OrganizationId}
-import domain/organization_repo.{
-  type OrganizationRepo, type RepoError, Conflict, Corrupt, NotFound,
-  OrganizationRepo, StorageError,
+import domain/organization_repo.{type OrganizationRepo, OrganizationRepo}
+import domain/repo_error.{
+  type RepoError, Conflict, Corrupt, NotFound, StorageError,
 }
 import domain/slug.{type Slug}
 import domain/user.{type UserId}
@@ -92,7 +92,10 @@ fn list_for_user(
   conn: db.Connection,
   uid: UserId,
 ) -> Promise(Result(List(Organization), RepoError)) {
-  use res <- promise.map(queries.list_user_organizations(conn, user.user_id(uid)))
+  use res <- promise.map(queries.list_user_organizations(
+    conn,
+    user.user_id(uid),
+  ))
   case res {
     Error(e) -> Error(storage_error(e))
     Ok(db.Returned(rows:, ..)) ->

@@ -59,7 +59,10 @@ pub fn show(
     Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
       promise.resolve(reply.json_response(404, error_json("space not found")))
     Error(find_space.RepoFailed(_)) ->
-      promise.resolve(reply.json_response(500, error_json("could not load space")))
+      promise.resolve(reply.json_response(
+        500,
+        error_json("could not load space"),
+      ))
     Ok(s) -> {
       use <- guard.require_permission_for_org(
         deps,
@@ -83,7 +86,10 @@ pub fn list_children(
     Error(find_space.NotFound) | Error(find_space.InvalidId(_)) ->
       promise.resolve(reply.json_response(404, error_json("space not found")))
     Error(find_space.RepoFailed(_)) ->
-      promise.resolve(reply.json_response(500, error_json("could not load space")))
+      promise.resolve(reply.json_response(
+        500,
+        error_json("could not load space"),
+      ))
     Ok(p) -> {
       use <- guard.require_permission_for_org(
         deps,
@@ -108,7 +114,12 @@ pub fn create(
   org_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  use oid <- guard.require_permission(deps, user, org_id, permission.SpaceCreate)
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.SpaceCreate,
+  )
   create_under_org(deps, oid, req)
 }
 

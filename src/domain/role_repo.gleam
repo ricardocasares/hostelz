@@ -2,16 +2,9 @@
 //// permission set; `find` loads both back.
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role.{type Role, type RoleId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  NotFound
-  /// Unique constraint (duplicate role name in the org) or a role still in use.
-  Conflict(String)
-  Corrupt(String)
-  StorageError(String)
-}
 
 pub type RoleRepo {
   RoleRepo(

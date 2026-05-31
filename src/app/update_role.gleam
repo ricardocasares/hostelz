@@ -3,10 +3,10 @@
 
 import domain/organization.{type OrganizationId}
 import domain/permission.{type Permission}
+import domain/repo_error.{type RepoError}
 import domain/role.{type Role}
 import domain/role_repo.{type RoleRepo}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type UpdateRoleError {
   InvalidId(role.RoleError)
@@ -14,7 +14,7 @@ pub type UpdateRoleError {
   CannotEditOwner
   InvalidName(role.RoleError)
   NameTaken
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -29,8 +29,8 @@ pub fn run(
     Ok(rid) -> {
       use found <- promise.await(repo.find(rid))
       case found {
-        Error(role_repo.NotFound) -> promise.resolve(Error(NotFound))
-        Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+        Error(repo_error.NotFound) -> promise.resolve(Error(NotFound))
+        Error(other) -> promise.resolve(Error(RepoFailed(other)))
         // A role from another org is "not found" through this org's path.
         Ok(existing) ->
           case role.organization_id(existing) == organization_id {
@@ -58,8 +58,8 @@ fn apply(
           use saved <- promise.map(repo.save(updated))
           case saved {
             Ok(Nil) -> Ok(updated)
-            Error(role_repo.Conflict(_)) -> Error(NameTaken)
-            Error(other) -> Error(RepoFailed(string.inspect(other)))
+            Error(repo_error.Conflict(_)) -> Error(NameTaken)
+            Error(other) -> Error(RepoFailed(other))
           }
         }
       }

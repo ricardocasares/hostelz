@@ -4,11 +4,11 @@
 import domain/membership.{type Membership}
 import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role.{type Role}
 import domain/role_repo.{type RoleRepo}
 import domain/user
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type UpdateMemberError {
   InvalidUserId(user.UserError)
@@ -16,7 +16,7 @@ pub type UpdateMemberError {
   RoleNotFound
   NotMember
   LastOwner
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -37,7 +37,13 @@ pub fn run(
           case role.organization_id(new_role) == organization_id {
             False -> promise.resolve(Error(RoleNotFound))
             True ->
-              change(membership_repo, role_repo, organization_id, user_id, new_role)
+              change(
+                membership_repo,
+                role_repo,
+                organization_id,
+                user_id,
+                new_role,
+              )
           }
       }
     }
@@ -53,16 +59,21 @@ fn change(
 ) -> Promise(Result(Membership, UpdateMemberError)) {
   use found <- promise.await(membership_repo.find(organization_id, user_id))
   case found {
-    Error(membership_repo.NotFound) -> promise.resolve(Error(NotMember))
-    Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+    Error(repo_error.NotFound) -> promise.resolve(Error(NotMember))
+    Error(other) -> promise.resolve(Error(RepoFailed(other)))
     Ok(member) -> {
       use current <- promise.await(role_repo.find(membership.role_id(member)))
       case current {
-        Error(e) -> promise.resolve(Error(RepoFailed(string.inspect(e))))
+        Error(e) -> promise.resolve(Error(RepoFailed(e)))
         Ok(cur) ->
           case role.is_owner(cur) && !role.is_owner(new_role) {
             True ->
-              guard_last_owner(membership_repo, organization_id, member, new_role)
+              guard_last_owner(
+                membership_repo,
+                organization_id,
+                member,
+                new_role,
+              )
             False -> save(membership_repo, member, new_role)
           }
       }
@@ -78,7 +89,7 @@ fn guard_last_owner(
 ) -> Promise(Result(Membership, UpdateMemberError)) {
   use count <- promise.await(membership_repo.count_owners(organization_id))
   case count {
-    Error(e) -> promise.resolve(Error(RepoFailed(string.inspect(e))))
+    Error(e) -> promise.resolve(Error(RepoFailed(e)))
     Ok(n) if n <= 1 -> promise.resolve(Error(LastOwner))
     Ok(_) -> save(membership_repo, member, new_role)
   }
@@ -93,6 +104,6 @@ fn save(
   use saved <- promise.map(membership_repo.save(updated))
   case saved {
     Ok(Nil) -> Ok(updated)
-    Error(e) -> Error(RepoFailed(string.inspect(e)))
+    Error(e) -> Error(RepoFailed(e))
   }
 }

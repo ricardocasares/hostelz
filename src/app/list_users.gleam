@@ -1,7 +1,8 @@
 //// Application use case: list all users.
 
+import domain/repo_error.{type RepoError}
 import domain/user.{type User}
-import domain/user_repo.{type RepoError, type UserRepo}
+import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 

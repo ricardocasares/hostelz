@@ -6,6 +6,7 @@ import domain/membership.{type Membership}
 import domain/membership_repo.{type MembershipRepo, MembershipRepo}
 import domain/organization
 import domain/permission
+import domain/repo_error
 import domain/role.{type Role}
 import domain/role_repo.{type RoleRepo, RoleRepo}
 import domain/user
@@ -27,7 +28,7 @@ fn a_membership(role_id: role.RoleId) -> Membership {
 }
 
 fn membership_repo_returning(
-  result: Result(Membership, membership_repo.RepoError),
+  result: Result(Membership, repo_error.RepoError),
 ) -> MembershipRepo {
   MembershipRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
@@ -38,7 +39,7 @@ fn membership_repo_returning(
   )
 }
 
-fn role_repo_returning(result: Result(Role, role_repo.RepoError)) -> RoleRepo {
+fn role_repo_returning(result: Result(Role, repo_error.RepoError)) -> RoleRepo {
   RoleRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
     find: fn(_) { promise.resolve(result) },
@@ -49,8 +50,8 @@ fn role_repo_returning(result: Result(Role, role_repo.RepoError)) -> RoleRepo {
 
 pub fn non_member_is_not_member_test() {
   use result <- promise.map(authorize.run(
-    membership_repo_returning(Error(membership_repo.NotFound)),
-    role_repo_returning(Error(role_repo.NotFound)),
+    membership_repo_returning(Error(repo_error.NotFound)),
+    role_repo_returning(Error(repo_error.NotFound)),
     an_org(),
     a_user(),
     permission.SpaceRead,

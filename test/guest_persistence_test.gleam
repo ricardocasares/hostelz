@@ -14,8 +14,8 @@ import db/organization_repo as org_repo
 import db/user_repo as usr_repo
 import domain/email
 import domain/guest
-import domain/guest_repo
 import domain/organization.{type OrganizationId}
+import domain/repo_error
 import domain/slug
 import domain/user.{type UserId}
 import gleam/dynamic/decode
@@ -130,7 +130,7 @@ pub fn guest_round_trip_test() {
   // unknown id -> NotFound
   let assert Ok(missing) = guest.new_id("g_missing")
   use nf <- promise.await(guests.find(missing))
-  assert nf == Error(guest_repo.NotFound)
+  assert nf == Error(repo_error.NotFound)
 
   promise.resolve(Nil)
 }

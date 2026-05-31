@@ -10,7 +10,7 @@ import db/role_repo
 import db/user_repo
 import domain/email
 import domain/organization
-import domain/organization_repo
+import domain/repo_error
 import domain/slug
 import domain/user
 import gleam/dynamic/decode
@@ -46,7 +46,7 @@ pub fn duplicate_slug_is_conflict_at_adapter_test() {
   let assert Ok(oid2) = organization.new_id("org_dup_2")
   let assert Ok(org2) = organization.new(oid2, s, "Second")
   use saved2 <- promise.map(orgs.save(org2))
-  let assert Error(organization_repo.Conflict(_)) = saved2
+  let assert Error(repo_error.Conflict(_)) = saved2
 }
 
 pub fn duplicate_slug_is_slug_taken_through_use_case_test() {

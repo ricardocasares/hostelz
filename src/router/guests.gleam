@@ -60,7 +60,10 @@ pub fn show(
     Error(find_guest.NotFound) | Error(find_guest.InvalidId(_)) ->
       promise.resolve(reply.json_response(404, error_json("guest not found")))
     Error(find_guest.RepoFailed(_)) ->
-      promise.resolve(reply.json_response(500, error_json("could not load guest")))
+      promise.resolve(reply.json_response(
+        500,
+        error_json("could not load guest"),
+      ))
     Ok(g) -> {
       use <- guard.require_permission_for_org(
         deps,
@@ -79,7 +82,12 @@ pub fn create(
   org_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  use oid <- guard.require_permission(deps, user, org_id, permission.GuestCreate)
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.GuestCreate,
+  )
   create_under_org(deps, oid, req)
 }
 

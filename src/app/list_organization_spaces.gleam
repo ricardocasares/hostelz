@@ -2,8 +2,9 @@
 //// (a flat list; the caller assembles the tree from each space's parent_id).
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/space.{type Space}
-import domain/space_repo.{type RepoError, type SpaceRepo}
+import domain/space_repo.{type SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 

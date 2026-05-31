@@ -4,9 +4,8 @@
 
 import brioche/sql as db
 import db/sql as queries
-import domain/session_repo.{
-  type RepoError, type SessionRepo, Corrupt, NotFound, SessionRepo, StorageError,
-}
+import domain/repo_error.{type RepoError, Corrupt, NotFound, StorageError}
+import domain/session_repo.{type SessionRepo, SessionRepo}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
@@ -25,7 +24,11 @@ fn save(
   token_hash: String,
   uid: UserId,
 ) -> Promise(Result(Nil, RepoError)) {
-  use res <- promise.map(queries.insert_session(conn, token_hash, user.user_id(uid)))
+  use res <- promise.map(queries.insert_session(
+    conn,
+    token_hash,
+    user.user_id(uid),
+  ))
   res
   |> result.replace(Nil)
   |> result.map_error(storage_error)
@@ -35,7 +38,10 @@ fn find_user(
   conn: db.Connection,
   token_hash: String,
 ) -> Promise(Result(UserId, RepoError)) {
-  use res <- promise.map(queries.find_session_user_by_token_hash(conn, token_hash))
+  use res <- promise.map(queries.find_session_user_by_token_hash(
+    conn,
+    token_hash,
+  ))
   case res {
     Error(e) -> Error(storage_error(e))
     Ok(db.Returned(rows: [], ..)) -> Error(NotFound)

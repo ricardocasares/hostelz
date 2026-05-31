@@ -5,6 +5,7 @@ import app/create_organization
 import domain/membership_repo.{MembershipRepo}
 import domain/organization
 import domain/organization_repo.{OrganizationRepo}
+import domain/repo_error
 import domain/role_repo.{RoleRepo}
 import domain/user
 import gleam/javascript/promise
@@ -21,24 +22,23 @@ fn an_owner() -> user.UserId {
 fn ok_orgs() -> organization_repo.OrganizationRepo {
   OrganizationRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
-    find: fn(_) { promise.resolve(Error(organization_repo.NotFound)) },
-    find_by_slug: fn(_) { promise.resolve(Error(organization_repo.NotFound)) },
+    find: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
+    find_by_slug: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
     list_all: fn() { promise.resolve(Ok([])) },
     list_for_user: fn(_) { promise.resolve(Ok([])) },
   )
 }
 
 fn slug_taken_orgs() -> organization_repo.OrganizationRepo {
-  OrganizationRepo(
-    ..ok_orgs(),
-    save: fn(_) { promise.resolve(Error(organization_repo.Conflict("dup"))) },
-  )
+  OrganizationRepo(..ok_orgs(), save: fn(_) {
+    promise.resolve(Error(repo_error.Conflict("dup")))
+  })
 }
 
 fn ok_roles() -> role_repo.RoleRepo {
   RoleRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
-    find: fn(_) { promise.resolve(Error(role_repo.NotFound)) },
+    find: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
     list_by_organization: fn(_) { promise.resolve(Ok([])) },
     delete: fn(_) { promise.resolve(Ok(Nil)) },
   )
@@ -47,7 +47,7 @@ fn ok_roles() -> role_repo.RoleRepo {
 fn ok_memberships() -> membership_repo.MembershipRepo {
   MembershipRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
-    find: fn(_, _) { promise.resolve(Error(membership_repo.NotFound)) },
+    find: fn(_, _) { promise.resolve(Error(repo_error.NotFound)) },
     list_by_organization: fn(_) { promise.resolve(Ok([])) },
     delete: fn(_, _) { promise.resolve(Ok(Nil)) },
     count_owners: fn(_) { promise.resolve(Ok(1)) },

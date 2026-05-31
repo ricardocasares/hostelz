@@ -14,8 +14,8 @@ import db/user_repo
 import domain/email
 import domain/organization
 import domain/permission
+import domain/repo_error as session_port
 import domain/role
-import domain/session_repo as session_port
 import domain/slug
 import domain/user
 import gleam/dynamic/decode
@@ -115,8 +115,8 @@ pub fn create_org_seeds_one_owner_test() {
     "Org",
   ))
   let assert Ok(org) = created
-  use count <- promise.map(membership_repo.new(conn).count_owners(
-    organization.id(org),
-  ))
+  use count <- promise.map(
+    membership_repo.new(conn).count_owners(organization.id(org)),
+  )
   assert count == Ok(1)
 }

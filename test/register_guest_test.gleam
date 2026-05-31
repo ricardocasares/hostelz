@@ -8,6 +8,7 @@ import app/register_guest
 import domain/guest
 import domain/guest_repo.{GuestRepo}
 import domain/organization
+import domain/repo_error
 import domain/user
 import gleam/javascript/promise
 import gleam/option.{None, Some}
@@ -15,7 +16,7 @@ import gleam/option.{None, Some}
 fn ok_repo() -> guest_repo.GuestRepo {
   GuestRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
-    find: fn(_) { promise.resolve(Error(guest_repo.NotFound)) },
+    find: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
     list_by_organization: fn(_) { promise.resolve(Ok([])) },
   )
 }

@@ -6,15 +6,15 @@ import auth/password
 import auth/token
 import domain/credential_repo.{type CredentialRepo}
 import domain/email
+import domain/repo_error.{type RepoError}
 import domain/session_repo.{type SessionRepo}
 import domain/user.{type User}
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type LoginError {
   InvalidCredentials
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -31,7 +31,14 @@ pub fn run(
       use found <- promise.await(user_repo.find_by_email(address))
       case found {
         Error(_) -> promise.resolve(Error(InvalidCredentials))
-        Ok(user) -> verify_and_issue(session_repo, credential_repo, generate_token, user, raw_password)
+        Ok(user) ->
+          verify_and_issue(
+            session_repo,
+            credential_repo,
+            generate_token,
+            user,
+            raw_password,
+          )
       }
     }
   }
@@ -53,10 +60,13 @@ fn verify_and_issue(
         False -> promise.resolve(Error(InvalidCredentials))
         True -> {
           let raw = generate_token()
-          use saved <- promise.map(session_repo.save(token.hash(raw), user.id(user)))
+          use saved <- promise.map(session_repo.save(
+            token.hash(raw),
+            user.id(user),
+          ))
           case saved {
             Ok(Nil) -> Ok(#(raw, user))
-            Error(e) -> Error(RepoFailed(string.inspect(e)))
+            Error(e) -> Error(RepoFailed(e))
           }
         }
       }

@@ -53,7 +53,12 @@ pub fn add(
   org_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  use oid <- guard.require_permission(deps, user, org_id, permission.MemberCreate)
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.MemberCreate,
+  )
   use payload <- promise.await(conversation.read_json(req.body))
   case payload {
     Error(_) ->
@@ -102,7 +107,12 @@ pub fn update_role(
   target_user_id: String,
   req: Request(RequestBody),
 ) -> Promise(Response(ResponseBody)) {
-  use oid <- guard.require_permission(deps, user, org_id, permission.MemberUpdate)
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.MemberUpdate,
+  )
   use payload <- promise.await(conversation.read_json(req.body))
   case payload {
     Error(_) ->
@@ -129,7 +139,10 @@ pub fn update_role(
             Error(update_member_role.RoleNotFound) ->
               reply.json_response(404, error_json("role not found"))
             Error(update_member_role.LastOwner) ->
-              reply.json_response(409, error_json("cannot demote the last owner"))
+              reply.json_response(
+                409,
+                error_json("cannot demote the last owner"),
+              )
             Error(update_member_role.InvalidUserId(_))
             | Error(update_member_role.InvalidRoleId(_)) ->
               reply.json_response(422, error_json("invalid user or role id"))
@@ -147,7 +160,12 @@ pub fn remove(
   org_id: String,
   target_user_id: String,
 ) -> Promise(Response(ResponseBody)) {
-  use oid <- guard.require_permission(deps, user, org_id, permission.MemberDelete)
+  use oid <- guard.require_permission(
+    deps,
+    user,
+    org_id,
+    permission.MemberDelete,
+  )
   use result <- promise.map(remove_member.run(
     membership_repo.new(deps.db),
     role_repo.new(deps.db),

@@ -2,8 +2,8 @@
 
 import db/user_repo
 import domain/email
+import domain/repo_error as port
 import domain/user
-import domain/user_repo as port
 
 pub fn reconstruct_valid_row_test() {
   let assert Ok(u) = user_repo.reconstruct("u_1", "ada@example.com", "Ada")

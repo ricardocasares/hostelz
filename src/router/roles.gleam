@@ -97,7 +97,10 @@ pub fn update(
         Error(update_role.NotFound) | Error(update_role.InvalidId(_)) ->
           reply.json_response(404, error_json("role not found"))
         Error(update_role.CannotEditOwner) ->
-          reply.json_response(403, error_json("the owner role cannot be edited"))
+          reply.json_response(
+            403,
+            error_json("the owner role cannot be edited"),
+          )
         Error(update_role.InvalidName(_)) ->
           reply.json_response(422, error_json("role name must not be empty"))
         Error(update_role.NameTaken) ->
@@ -141,14 +144,17 @@ fn with_role_input(
 ) -> Promise(Response(ResponseBody)) {
   use payload <- promise.await(conversation.read_json(req.body))
   case payload {
-    Error(_) -> next(Error(reply.json_response(400, error_json("invalid JSON"))))
+    Error(_) ->
+      next(Error(reply.json_response(400, error_json("invalid JSON"))))
     Ok(data) ->
       case decode.run(data, role_input_decoder()) {
         Error(_) ->
-          next(Error(reply.json_response(
-            422,
-            error_json("expected \"name\" and \"permissions\""),
-          )))
+          next(
+            Error(reply.json_response(
+              422,
+              error_json("expected \"name\" and \"permissions\""),
+            )),
+          )
         Ok(input) ->
           case parse_permissions(input.permissions) {
             Error(message) ->

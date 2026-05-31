@@ -3,15 +3,9 @@
 
 import domain/membership.{type Membership}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  NotFound
-  Conflict(String)
-  Corrupt(String)
-  StorageError(String)
-}
 
 pub type MembershipRepo {
   MembershipRepo(

@@ -6,12 +6,12 @@ import domain/email
 import domain/membership.{type Membership}
 import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role
 import domain/role_repo.{type RoleRepo}
 import domain/user
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type AddMemberError {
   InvalidEmail(email.EmailError)
@@ -19,7 +19,7 @@ pub type AddMemberError {
   RoleNotFound
   UserNotFound
   AlreadyMember
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -82,15 +82,15 @@ fn add(
   use existing <- promise.await(membership_repo.find(organization_id, user_id))
   case existing {
     Ok(_) -> promise.resolve(Error(AlreadyMember))
-    Error(membership_repo.NotFound) -> {
+    Error(repo_error.NotFound) -> {
       let assert Ok(id) = membership.new_id(generate_id())
       let member = membership.new(id, organization_id, user_id, role_id)
       use saved <- promise.map(membership_repo.save(member))
       case saved {
         Ok(Nil) -> Ok(member)
-        Error(e) -> Error(RepoFailed(string.inspect(e)))
+        Error(e) -> Error(RepoFailed(e))
       }
     }
-    Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+    Error(other) -> promise.resolve(Error(RepoFailed(other)))
   }
 }

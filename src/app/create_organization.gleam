@@ -6,22 +6,22 @@
 //// transaction would be ideal — see the repo note.)
 
 import domain/membership
+import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type Organization}
 import domain/organization_repo.{type OrganizationRepo}
+import domain/repo_error.{type RepoError}
 import domain/role
 import domain/role_repo.{type RoleRepo}
-import domain/membership_repo.{type MembershipRepo}
 import domain/slug
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
-import gleam/string
 
 pub type CreateOrganizationError {
   InvalidOrganization(organization.OrganizationError)
   InvalidSlug(slug.SlugError)
   SlugTaken
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -38,9 +38,8 @@ pub fn run(
     Ok(org) -> {
       use saved <- promise.await(org_repo.save(org))
       case saved {
-        Error(organization_repo.Conflict(_)) ->
-          promise.resolve(Error(SlugTaken))
-        Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+        Error(repo_error.Conflict(_)) -> promise.resolve(Error(SlugTaken))
+        Error(other) -> promise.resolve(Error(RepoFailed(other)))
         Ok(Nil) ->
           seed_owner(role_repo, membership_repo, generate_id, org, owner)
       }
@@ -59,7 +58,7 @@ fn seed_owner(
   let owner_role = role.owner(role_id, organization.id(org))
   use role_saved <- promise.await(role_repo.save(owner_role))
   case role_saved {
-    Error(e) -> promise.resolve(Error(RepoFailed(string.inspect(e))))
+    Error(e) -> promise.resolve(Error(RepoFailed(e)))
     Ok(Nil) -> {
       let assert Ok(membership_id) = membership.new_id(generate_id())
       let member =
@@ -72,7 +71,7 @@ fn seed_owner(
       use member_saved <- promise.map(membership_repo.save(member))
       case member_saved {
         Ok(Nil) -> Ok(org)
-        Error(e) -> Error(RepoFailed(string.inspect(e)))
+        Error(e) -> Error(RepoFailed(e))
       }
     }
   }

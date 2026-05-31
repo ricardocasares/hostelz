@@ -3,6 +3,7 @@
 
 import app/register_user
 import domain/credential_repo.{CredentialRepo}
+import domain/repo_error
 import domain/user
 import domain/user_repo.{UserRepo}
 import gleam/javascript/promise
@@ -14,24 +15,22 @@ fn gen(id: String) -> fn() -> String {
 fn ok_users() -> user_repo.UserRepo {
   UserRepo(
     save: fn(_) { promise.resolve(Ok(Nil)) },
-    find: fn(_) { promise.resolve(Error(user_repo.NotFound)) },
-    find_by_email: fn(_) { promise.resolve(Error(user_repo.NotFound)) },
+    find: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
+    find_by_email: fn(_) { promise.resolve(Error(repo_error.NotFound)) },
     list_all: fn() { promise.resolve(Ok([])) },
   )
 }
 
 fn conflict_users() -> user_repo.UserRepo {
-  UserRepo(
-    ..ok_users(),
-    save: fn(_) { promise.resolve(Error(user_repo.Conflict("dup"))) },
-  )
+  UserRepo(..ok_users(), save: fn(_) {
+    promise.resolve(Error(repo_error.Conflict("dup")))
+  })
 }
 
 fn ok_credentials() -> credential_repo.CredentialRepo {
-  CredentialRepo(
-    save: fn(_, _) { promise.resolve(Ok(Nil)) },
-    find_hash: fn(_) { promise.resolve(Error(credential_repo.NotFound)) },
-  )
+  CredentialRepo(save: fn(_, _) { promise.resolve(Ok(Nil)) }, find_hash: fn(_) {
+    promise.resolve(Error(repo_error.NotFound))
+  })
 }
 
 pub fn register_succeeds_test() {

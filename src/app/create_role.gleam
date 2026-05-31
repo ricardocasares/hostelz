@@ -4,16 +4,16 @@
 
 import domain/organization.{type OrganizationId}
 import domain/permission.{type Permission}
+import domain/repo_error.{type RepoError}
 import domain/role.{type Role}
 import domain/role_repo.{type RoleRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
-import gleam/string
 
 pub type CreateRoleError {
   InvalidRole(role.RoleError)
   NameTaken
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -29,8 +29,8 @@ pub fn run(
       use saved <- promise.map(repo.save(new_role))
       case saved {
         Ok(Nil) -> Ok(new_role)
-        Error(role_repo.Conflict(_)) -> Error(NameTaken)
-        Error(other) -> Error(RepoFailed(string.inspect(other)))
+        Error(repo_error.Conflict(_)) -> Error(NameTaken)
+        Error(other) -> Error(RepoFailed(other))
       }
     }
   }

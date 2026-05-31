@@ -11,10 +11,9 @@ import brioche/sql as db
 import db/sql as queries
 import domain/email
 import domain/guest.{type Guest, type GuestId}
-import domain/guest_repo.{
-  type GuestRepo, type RepoError, Corrupt, GuestRepo, NotFound, StorageError,
-}
+import domain/guest_repo.{type GuestRepo, GuestRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError, Corrupt, NotFound, StorageError}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 import gleam/list

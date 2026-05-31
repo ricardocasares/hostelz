@@ -7,11 +7,11 @@ import brioche/sql as db
 import db/sql as queries
 import domain/organization.{type OrganizationId}
 import domain/permission.{type Permission}
-import domain/role.{type Role, type RoleId}
-import domain/role_repo.{
-  type RepoError, type RoleRepo, Conflict, Corrupt, NotFound, RoleRepo,
-  StorageError,
+import domain/repo_error.{
+  type RepoError, Conflict, Corrupt, NotFound, StorageError,
 }
+import domain/role.{type Role, type RoleId}
+import domain/role_repo.{type RoleRepo, RoleRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/result
@@ -68,7 +68,13 @@ fn find(conn: db.Connection, id: RoleId) -> Promise(Result(Role, RepoError)) {
     Error(e) -> promise.resolve(Error(storage_error(e)))
     Ok(db.Returned(rows: [], ..)) -> promise.resolve(Error(NotFound))
     Ok(db.Returned(rows: [row, ..], ..)) ->
-      with_permissions(conn, row.id, row.organization_id, row.name, row.is_owner)
+      with_permissions(
+        conn,
+        row.id,
+        row.organization_id,
+        row.name,
+        row.is_owner,
+      )
   }
 }
 
@@ -85,7 +91,13 @@ fn list_by_organization(
     Ok(db.Returned(rows:, ..)) -> {
       let loads =
         list.map(rows, fn(row) {
-          with_permissions(conn, row.id, row.organization_id, row.name, row.is_owner)
+          with_permissions(
+            conn,
+            row.id,
+            row.organization_id,
+            row.name,
+            row.is_owner,
+          )
         })
       use results <- promise.map(promise.await_list(loads))
       result.all(results)
@@ -132,9 +144,7 @@ pub fn reconstruct(
   |> result.map_error(corrupt)
 }
 
-fn parse_permissions(
-  raw: List(String),
-) -> Result(List(Permission), RepoError) {
+fn parse_permissions(raw: List(String)) -> Result(List(Permission), RepoError) {
   list.try_map(raw, fn(s) {
     permission.from_string(s)
     |> result.replace_error(Corrupt("unknown permission: " <> s))

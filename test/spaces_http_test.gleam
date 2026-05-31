@@ -122,7 +122,12 @@ pub fn get_org_spaces_returns_200_test() {
   use #(token, org_id) <- promise.await(support.owner_setup(deps))
   use res <- promise.map(router.handle(
     deps,
-    support.authed("GET", "/api/organizations/" <> org_id <> "/spaces", "", token),
+    support.authed(
+      "GET",
+      "/api/organizations/" <> org_id <> "/spaces",
+      "",
+      token,
+    ),
   ))
   assert res.status == 200
 }

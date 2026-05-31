@@ -28,9 +28,24 @@ pub type Permission {
 
 /// Every permission — for validation and for listing the catalog over the wire.
 pub const catalog: List(Permission) = [
-  OrgRead, OrgUpdate, OrgDelete, MemberCreate, MemberRead, MemberUpdate,
-  MemberDelete, RoleCreate, RoleRead, RoleUpdate, RoleDelete, SpaceCreate,
-  SpaceRead, SpaceUpdate, SpaceDelete, GuestCreate, GuestRead, GuestUpdate,
+  OrgRead,
+  OrgUpdate,
+  OrgDelete,
+  MemberCreate,
+  MemberRead,
+  MemberUpdate,
+  MemberDelete,
+  RoleCreate,
+  RoleRead,
+  RoleUpdate,
+  RoleDelete,
+  SpaceCreate,
+  SpaceRead,
+  SpaceUpdate,
+  SpaceDelete,
+  GuestCreate,
+  GuestRead,
+  GuestUpdate,
   GuestDelete,
 ]
 

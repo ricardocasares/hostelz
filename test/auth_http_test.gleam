@@ -90,7 +90,10 @@ pub fn login_wrong_password_returns_401_test() {
 
 pub fn me_without_token_returns_401_test() {
   let deps = support.test_deps()
-  use res <- promise.map(router.handle(deps, support.req("GET", "/api/auth/me", "")))
+  use res <- promise.map(router.handle(
+    deps,
+    support.req("GET", "/api/auth/me", ""),
+  ))
   assert res.status == 401
 }
 

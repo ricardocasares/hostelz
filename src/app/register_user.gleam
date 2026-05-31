@@ -7,18 +7,18 @@
 import auth/password
 import domain/credential_repo.{type CredentialRepo}
 import domain/email
+import domain/repo_error.{type RepoError}
 import domain/user.{type User}
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
-import gleam/string
 
 pub type RegisterUserError {
   InvalidUser(user.UserError)
   InvalidEmail(email.EmailError)
   InvalidPassword(password.PasswordError)
   EmailTaken
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -34,8 +34,8 @@ pub fn run(
     Ok(new_user) -> {
       use saved <- promise.await(user_repo.save(new_user))
       case saved {
-        Error(user_repo.Conflict(_)) -> promise.resolve(Error(EmailTaken))
-        Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+        Error(repo_error.Conflict(_)) -> promise.resolve(Error(EmailTaken))
+        Error(other) -> promise.resolve(Error(RepoFailed(other)))
         Ok(Nil) -> store_credential(credential_repo, new_user, raw_password)
       }
     }
@@ -51,7 +51,7 @@ fn store_credential(
   use saved <- promise.map(credential_repo.save(user.id(new_user), hash))
   case saved {
     Ok(Nil) -> Ok(new_user)
-    Error(e) -> Error(RepoFailed(string.inspect(e)))
+    Error(e) -> Error(RepoFailed(e))
   }
 }
 

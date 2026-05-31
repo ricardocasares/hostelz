@@ -80,10 +80,14 @@ fn dispatch(
     Delete, ["organizations", oid, "roles", rid] ->
       roles.delete(deps, user, oid, rid)
 
-    Get, ["organizations", oid, "guests"] -> guests.list_for_org(deps, user, oid)
-    Post, ["organizations", oid, "guests"] -> guests.create(deps, user, oid, req)
-    Get, ["organizations", oid, "spaces"] -> spaces.list_for_org(deps, user, oid)
-    Post, ["organizations", oid, "spaces"] -> spaces.create(deps, user, oid, req)
+    Get, ["organizations", oid, "guests"] ->
+      guests.list_for_org(deps, user, oid)
+    Post, ["organizations", oid, "guests"] ->
+      guests.create(deps, user, oid, req)
+    Get, ["organizations", oid, "spaces"] ->
+      spaces.list_for_org(deps, user, oid)
+    Post, ["organizations", oid, "spaces"] ->
+      spaces.create(deps, user, oid, req)
 
     Get, ["guests", id] -> guests.show(deps, user, id)
     Get, ["spaces", id] -> spaces.show(deps, user, id)

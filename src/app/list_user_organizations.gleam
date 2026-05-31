@@ -1,7 +1,8 @@
 //// Application use case: the organizations the current user belongs to.
 
 import domain/organization.{type Organization}
-import domain/organization_repo.{type OrganizationRepo, type RepoError}
+import domain/organization_repo.{type OrganizationRepo}
+import domain/repo_error.{type RepoError}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
 import gleam/result

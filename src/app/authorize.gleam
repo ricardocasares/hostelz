@@ -6,16 +6,16 @@ import domain/membership
 import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type OrganizationId}
 import domain/permission.{type Permission}
+import domain/repo_error.{type RepoError}
 import domain/role
 import domain/role_repo.{type RoleRepo}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type AuthzError {
   NotMember
   Forbidden
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -27,12 +27,12 @@ pub fn run(
 ) -> Promise(Result(Nil, AuthzError)) {
   use found <- promise.await(membership_repo.find(organization_id, user_id))
   case found {
-    Error(membership_repo.NotFound) -> promise.resolve(Error(NotMember))
-    Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+    Error(repo_error.NotFound) -> promise.resolve(Error(NotMember))
+    Error(other) -> promise.resolve(Error(RepoFailed(other)))
     Ok(member) -> {
       use role <- promise.map(role_repo.find(membership.role_id(member)))
       case role {
-        Error(e) -> Error(RepoFailed(string.inspect(e)))
+        Error(e) -> Error(RepoFailed(e))
         Ok(r) ->
           case role.allows(r, needed) {
             True -> Ok(Nil)

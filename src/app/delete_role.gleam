@@ -4,17 +4,17 @@
 //// "not found" through this org's path.
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role
 import domain/role_repo.{type RoleRepo}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type DeleteRoleError {
   InvalidId(role.RoleError)
   NotFound
   CannotDeleteOwner
   RoleInUse
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -27,8 +27,8 @@ pub fn run(
     Ok(rid) -> {
       use found <- promise.await(repo.find(rid))
       case found {
-        Error(role_repo.NotFound) -> promise.resolve(Error(NotFound))
-        Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+        Error(repo_error.NotFound) -> promise.resolve(Error(NotFound))
+        Error(other) -> promise.resolve(Error(RepoFailed(other)))
         Ok(existing) ->
           case role.organization_id(existing) == organization_id {
             False -> promise.resolve(Error(NotFound))
@@ -50,8 +50,8 @@ fn guard(
       use deleted <- promise.map(repo.delete(rid))
       case deleted {
         Ok(Nil) -> Ok(Nil)
-        Error(role_repo.Conflict(_)) -> Error(RoleInUse)
-        Error(other) -> Error(RepoFailed(string.inspect(other)))
+        Error(repo_error.Conflict(_)) -> Error(RoleInUse)
+        Error(other) -> Error(RepoFailed(other))
       }
     }
   }

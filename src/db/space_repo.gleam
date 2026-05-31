@@ -9,10 +9,9 @@
 import brioche/sql as db
 import db/sql as queries
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError, Corrupt, NotFound, StorageError}
 import domain/space.{type Space, type SpaceId}
-import domain/space_repo.{
-  type RepoError, type SpaceRepo, Corrupt, NotFound, SpaceRepo, StorageError,
-}
+import domain/space_repo.{type SpaceRepo, SpaceRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option.{type Option, None, Some}

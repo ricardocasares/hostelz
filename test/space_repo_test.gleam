@@ -3,8 +3,8 @@
 //// no database.
 
 import db/space_repo
+import domain/repo_error as port
 import domain/space
-import domain/space_repo as port
 import gleam/option.{None, Some}
 
 pub fn reconstruct_valid_root_grouping_test() {

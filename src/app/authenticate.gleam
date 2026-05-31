@@ -3,15 +3,15 @@
 //// unexpired session, then loads the user. Any miss is `InvalidSession`.
 
 import auth/token
+import domain/repo_error.{type RepoError}
 import domain/session_repo.{type SessionRepo}
 import domain/user.{type User}
 import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
-import gleam/string
 
 pub type AuthError {
   InvalidSession
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -21,8 +21,8 @@ pub fn run(
 ) -> Promise(Result(User, AuthError)) {
   use found <- promise.await(session_repo.find_user(token.hash(raw_token)))
   case found {
-    Error(session_repo.NotFound) -> promise.resolve(Error(InvalidSession))
-    Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+    Error(repo_error.NotFound) -> promise.resolve(Error(InvalidSession))
+    Error(other) -> promise.resolve(Error(RepoFailed(other)))
     Ok(user_id) -> {
       use user <- promise.map(user_repo.find(user_id))
       case user {

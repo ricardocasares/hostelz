@@ -1,8 +1,9 @@
 //// Application use case: find a user by id. A "no such user" repo failure is
 //// lifted to its own `NotFound` variant so the HTTP boundary can answer 404.
 
+import domain/repo_error.{type RepoError}
 import domain/user.{type User}
-import domain/user_repo.{type RepoError, type UserRepo}
+import domain/user_repo.{type UserRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 
@@ -27,7 +28,7 @@ pub fn run(
 
 fn to_error(error: RepoError) -> FindUserError {
   case error {
-    user_repo.NotFound -> NotFound
+    repo_error.NotFound -> NotFound
     other -> RepoFailed(other)
   }
 }

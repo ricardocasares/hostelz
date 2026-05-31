@@ -4,18 +4,18 @@
 import domain/membership
 import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role
 import domain/role_repo.{type RoleRepo}
 import domain/user
 import gleam/javascript/promise.{type Promise}
 import gleam/result
-import gleam/string
 
 pub type RemoveMemberError {
   InvalidUserId(user.UserError)
   NotMember
   LastOwner
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -29,8 +29,8 @@ pub fn run(
     Ok(user_id) -> {
       use found <- promise.await(membership_repo.find(organization_id, user_id))
       case found {
-        Error(membership_repo.NotFound) -> promise.resolve(Error(NotMember))
-        Error(other) -> promise.resolve(Error(RepoFailed(string.inspect(other))))
+        Error(repo_error.NotFound) -> promise.resolve(Error(NotMember))
+        Error(other) -> promise.resolve(Error(RepoFailed(other)))
         Ok(member) ->
           guard(membership_repo, role_repo, organization_id, user_id, member)
       }
@@ -47,14 +47,16 @@ fn guard(
 ) -> Promise(Result(Nil, RemoveMemberError)) {
   use role_found <- promise.await(role_repo.find(membership.role_id(member)))
   case role_found {
-    Error(e) -> promise.resolve(Error(RepoFailed(string.inspect(e))))
+    Error(e) -> promise.resolve(Error(RepoFailed(e)))
     Ok(r) ->
       case role.is_owner(r) {
         False -> delete(membership_repo, organization_id, user_id)
         True -> {
-          use count <- promise.await(membership_repo.count_owners(organization_id))
+          use count <- promise.await(membership_repo.count_owners(
+            organization_id,
+          ))
           case count {
-            Error(e) -> promise.resolve(Error(RepoFailed(string.inspect(e))))
+            Error(e) -> promise.resolve(Error(RepoFailed(e)))
             Ok(n) if n <= 1 -> promise.resolve(Error(LastOwner))
             Ok(_) -> delete(membership_repo, organization_id, user_id)
           }
@@ -69,5 +71,5 @@ fn delete(
   user_id: user.UserId,
 ) -> Promise(Result(Nil, RemoveMemberError)) {
   use deleted <- promise.map(membership_repo.delete(organization_id, user_id))
-  deleted |> result.map_error(fn(e) { RepoFailed(string.inspect(e)) })
+  deleted |> result.map_error(fn(e) { RepoFailed(e) })
 }

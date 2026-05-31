@@ -2,14 +2,9 @@
 //// raw token never touches the database. `find_user` returns the owning user
 //// only for an *unexpired* session (expiry is filtered in SQL).
 
+import domain/repo_error.{type RepoError}
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}
-
-pub type RepoError {
-  NotFound
-  Corrupt(String)
-  StorageError(String)
-}
 
 pub type SessionRepo {
   SessionRepo(

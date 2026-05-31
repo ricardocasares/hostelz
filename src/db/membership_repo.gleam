@@ -4,11 +4,9 @@
 import brioche/sql as db
 import db/sql as queries
 import domain/membership.{type Membership}
-import domain/membership_repo.{
-  type MembershipRepo, type RepoError, Corrupt, MembershipRepo, NotFound,
-  StorageError,
-}
+import domain/membership_repo.{type MembershipRepo, MembershipRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError, Corrupt, NotFound, StorageError}
 import domain/role
 import domain/user.{type UserId}
 import gleam/javascript/promise.{type Promise}

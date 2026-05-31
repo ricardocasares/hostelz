@@ -2,13 +2,13 @@
 //// token hash is fine.
 
 import auth/token
+import domain/repo_error.{type RepoError}
 import domain/session_repo.{type SessionRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
-import gleam/string
 
 pub type LogoutError {
-  RepoFailed(String)
+  RepoFailed(RepoError)
 }
 
 pub fn run(
@@ -16,5 +16,5 @@ pub fn run(
   raw_token: String,
 ) -> Promise(Result(Nil, LogoutError)) {
   use deleted <- promise.map(session_repo.delete(token.hash(raw_token)))
-  deleted |> result.map_error(fn(e) { RepoFailed(string.inspect(e)) })
+  deleted |> result.map_error(fn(e) { RepoFailed(e) })
 }

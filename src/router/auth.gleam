@@ -98,7 +98,8 @@ pub fn login(
             input.password,
           ))
           case result {
-            Ok(#(token, user)) -> reply.json_response(200, session_json(token, user))
+            Ok(#(token, user)) ->
+              reply.json_response(200, session_json(token, user))
             Error(login.InvalidCredentials) ->
               reply.json_response(401, error_json("invalid email or password"))
             Error(login.RepoFailed(_)) ->
@@ -174,8 +175,7 @@ fn register_error(error: RegisterUserError) -> Response(ResponseBody) {
       )
     EmailTaken ->
       reply.json_response(409, error_json("email already registered"))
-    RepoFailed(_) ->
-      reply.json_response(500, error_json("could not register"))
+    RepoFailed(_) -> reply.json_response(500, error_json("could not register"))
   }
 }
 

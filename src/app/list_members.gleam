@@ -1,8 +1,9 @@
 //// Application use case: list an organization's memberships.
 
 import domain/membership.{type Membership}
-import domain/membership_repo.{type MembershipRepo, type RepoError}
+import domain/membership_repo.{type MembershipRepo}
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 

@@ -1,8 +1,9 @@
 //// Application use case: list an organization's roles.
 
 import domain/organization.{type OrganizationId}
+import domain/repo_error.{type RepoError}
 import domain/role.{type Role}
-import domain/role_repo.{type RepoError, type RoleRepo}
+import domain/role_repo.{type RoleRepo}
 import gleam/javascript/promise.{type Promise}
 import gleam/result
 
