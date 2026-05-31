@@ -56,25 +56,22 @@ fn seed_owner(
 ) -> Promise(Result(Organization, CreateOrganizationError)) {
   let assert Ok(role_id) = role.new_id(generate_id())
   let owner_role = role.owner(role_id, organization.id(org))
-  use role_saved <- promise.await(role_repo.save(owner_role))
-  case role_saved {
-    Error(e) -> promise.resolve(Error(RepoFailed(e)))
-    Ok(Nil) -> {
-      let assert Ok(membership_id) = membership.new_id(generate_id())
-      let member =
-        membership.new(
-          membership_id,
-          organization.id(org),
-          owner,
-          role.id(owner_role),
-        )
-      use member_saved <- promise.map(membership_repo.save(member))
-      case member_saved {
-        Ok(Nil) -> Ok(org)
-        Error(e) -> Error(RepoFailed(e))
-      }
-    }
-  }
+  use _ <- promise.try_await(
+    role_repo.save(owner_role)
+    |> promise.map(fn(r) { result.map_error(r, RepoFailed) }),
+  )
+  let assert Ok(membership_id) = membership.new_id(generate_id())
+  let member =
+    membership.new(
+      membership_id,
+      organization.id(org),
+      owner,
+      role.id(owner_role),
+    )
+  membership_repo.save(member)
+  |> promise.map(fn(saved) {
+    saved |> result.replace(org) |> result.map_error(RepoFailed)
+  })
 }
 
 fn build(

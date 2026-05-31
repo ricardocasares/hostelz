@@ -49,10 +49,7 @@ fn store_credential(
 ) -> Promise(Result(User, RegisterUserError)) {
   use hash <- promise.await(password.hash(raw_password))
   use saved <- promise.map(credential_repo.save(user.id(new_user), hash))
-  case saved {
-    Ok(Nil) -> Ok(new_user)
-    Error(e) -> Error(RepoFailed(e))
-  }
+  saved |> result.replace(new_user) |> result.map_error(RepoFailed)
 }
 
 /// Pure validation, password policy included, before any IO.
