@@ -29,7 +29,12 @@ This is hostelz, a PMS for hostelz and more.
 - rely on sum-type errors + case
 - aggregates as consistency boundaries
 - modules + opacity + record update syntax
-- linear top-to-bottom domain rules	`use <-` for guard chains
+- avoid deeply nested cases, prefer small functions
+- top-to-bottom domain rules `use <-` for guard chains
+- prefer `use <- result.try`
+- prefer `use <- promise.try`
+- prefer `use <- promise.map`
+- prefer `use <- promise.await`
 
 ## Migrations
 
