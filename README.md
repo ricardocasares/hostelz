@@ -94,6 +94,24 @@ Individually: `bun dev:api`, `bun dev:vite`, `bun dev:test`.
 
 Type-check with `gleam check`; format with `gleam format`.
 
+## Frontend
+
+A single-page app built with [Lustre](https://lustre.build) (Gleam's Elm-style
+framework), compiled by the `vite-gleam` plugin and styled with Tailwind CSS v4
+(`@tailwindcss/vite`).
+
+- Entry: `index.html` → `src/hostelz.ts` → `src/hostelz.gleam` (the Lustre app:
+  `Model`/`Msg`/`init`/`update`/`view`).
+- Supporting modules under `src/client/`:
+  - `route.gleam` — URL routing (`modem`).
+  - `api.gleam` — HTTP effects (`rsvp`) against the backend.
+  - `decode.gleam` — decodes API JSON into the server's opaque domain types.
+  - `storage.gleam` (+ `storage_ffi.mjs`) — bearer token in `localStorage`.
+
+The client calls the API same-origin under `/api`. In dev, Vite proxies `/api`
+to the Bun API server on `:3000` (see `vite.config.ts`), so there is no CORS to
+configure; in production both are served from the same origin.
+
 ## Testing
 
 ```sh
